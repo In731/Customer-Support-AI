@@ -10,6 +10,9 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [knowledge, setKnowledge] = useState("")
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [file, setFile] = useState<File | null>(null)
+    const [uploadingDoc, setUploadingDoc] = useState(false)
+    const [uploadMsg, setUploadMsg] = useState("")
     const handleSettings = async () => {
         setLoading(true)
         try {
@@ -43,6 +46,27 @@ if(ownerId){
 }
 
      },[ownerId])
+
+    const handleUpload = async () => {
+        if (!file) return;
+        setUploadingDoc(true);
+        setUploadMsg("");
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("tenantId", ownerId);
+            const res = await axios.post("/api/knowledge", formData);
+            if (res.data.success) {
+                setUploadMsg("Document uploaded and processed successfully!");
+                setFile(null);
+            }
+        } catch (error: any) {
+            console.log(error);
+            setUploadMsg(error.response?.data?.error || "Upload failed");
+        }
+        setUploadingDoc(false);
+    }
+
     return (
         <div className='min-h-screen bg-zinc-50 text-zinc-900'>
             <motion.div
@@ -83,6 +107,24 @@ if(ownerId){
 • Delivery time: 3–5 working days
 • Cash on Delivery available
 • Support hours`} onChange={(e) => setKnowledge(e.target.value)} value={knowledge} />
+                        </div>
+                    </div>
+
+                    <div className='mb-10'>
+                        <h1 className='text-lg font-medium mb-4'>Advanced Knowledge Documents (PDF/Text)</h1>
+                        <p className='text-sm text-zinc-500 mb-4'>Upload PDFs to be processed and searchable by the AI.</p>
+                        <div className='space-y-4 border border-zinc-300 rounded-xl p-4'>
+                            <input type="file" accept=".pdf,.txt" onChange={(e) => setFile(e.target.files?.[0] || null)} className='text-sm' />
+                            <motion.button 
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                disabled={uploadingDoc || !file}
+                                onClick={handleUpload}
+                                className="px-5 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 transition disabled:opacity-60 block"
+                            >
+                                {uploadingDoc ? "Processing..." : "Upload & Train"}
+                            </motion.button>
+                            {uploadMsg && <p className='text-sm mt-2 text-zinc-600'>{uploadMsg}</p>}
                         </div>
                     </div>
 

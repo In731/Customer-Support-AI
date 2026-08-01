@@ -14,7 +14,7 @@ if(cache.conn){
     return cache.conn
 }
 if(!cache.promise){
-    cache.promise=connect(mongo_Url!).then((c)=>c.connection)
+    cache.promise=connect(mongo_Url!, { family: 4 }).then((c)=>c.connection)
 }
 
 try {
