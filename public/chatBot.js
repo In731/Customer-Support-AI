@@ -11,7 +11,7 @@
     }
 
     const button = document.createElement("div")
-    button.innerHTML = "🗨️"
+    button.innerHTML = "🤖"
 
     Object.assign(button.style, {
         position: "fixed",
@@ -167,7 +167,7 @@
 
             const data = await response.json()
             messageArea.removeChild(typing)
-            
+
             if (response.ok) {
                 addMessage(data || "something went wrong", "ai")
             } else {

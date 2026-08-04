@@ -1,8 +1,9 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { motion } from "motion/react"
+import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
+
 function DashboardClient({ ownerId }: { ownerId: string }) {
     const navigate = useRouter()
     const [businessName, setBusinessName] = useState("")
@@ -13,11 +14,11 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [file, setFile] = useState<File | null>(null)
     const [uploadingDoc, setUploadingDoc] = useState(false)
     const [uploadMsg, setUploadMsg] = useState("")
+
     const handleSettings = async () => {
         setLoading(true)
         try {
-            const result = await axios.post("/api/settings", { ownerId, businessName, supportEmail, knowledge })
-            console.log(result.data)
+            await axios.post("/api/settings", { ownerId, businessName, supportEmail, knowledge })
             setLoading(false)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
@@ -26,26 +27,22 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
             setLoading(false)
         }
     }
-     useEffect(()=>{
-if(ownerId){
-    const handleGetDetails=async ()=>{
-       try {
-            const result = await axios.post("/api/settings/get", { ownerId })
-           setBusinessName(result.data.businessName)
-            setSupportEmail(result.data.supportEmail)
-             setKnowledge(result.data.knowledge)
 
-            
-        } catch (error) {
-            console.log(error)
-           
+    useEffect(() => {
+        if (ownerId) {
+            const handleGetDetails = async () => {
+                try {
+                    const result = await axios.post("/api/settings/get", { ownerId })
+                    setBusinessName(result.data.businessName || "")
+                    setSupportEmail(result.data.supportEmail || "")
+                    setKnowledge(result.data.knowledge || "")
+                } catch (error) {
+                    console.log(error)
+                }
+            }
+            handleGetDetails()
         }
-    }
-
-    handleGetDetails()
-}
-
-     },[ownerId])
+    }, [ownerId])
 
     const handleUpload = async () => {
         if (!file) return;
@@ -68,92 +65,182 @@ if(ownerId){
     }
 
     return (
-        <div className='min-h-screen bg-zinc-50 text-zinc-900'>
+        <div className='min-h-screen bg-zinc-50/50 text-zinc-900 selection:bg-indigo-100 selection:text-indigo-900 pb-20'>
+            {/* Minimal Background Effect */}
+            <div className="fixed top-0 inset-x-0 h-64 bg-gradient-to-b from-indigo-50/50 to-transparent pointer-events-none" />
+
             <motion.div
-                initial={{ y: -50 }}
-                animate={{ y: 0 }}
-                transition={{ duration: 0.5 }}
-                className='fixed top-0 left-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-200'
+                initial={{ y: -50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className='sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50 supports-[backdrop-filter]:bg-white/40 shadow-sm shadow-zinc-200/20'
             >
                 <div className='max-w-7xl mx-auto px-6 h-16 flex items-center justify-between'>
-                    <div className='text-lg font-semibold tracking-tight' onClick={() => navigate.push("/")}>Support <span className='text-zinc-400'>AI</span></div>
-                    <button className='px-4 py-2 rounded-lg border border-zinc-300 text-sm hover:bg-zinc-100 transition' onClick={()=>navigate.push("/embed")}>Embed ChatBot</button>
+                    <div className='flex items-center gap-2.5 cursor-pointer group' onClick={() => navigate.push("/")}>
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md group-hover:shadow-indigo-500/20 transition-all group-hover:scale-105">
+                           <span className="text-white font-bold text-lg">N</span>
+                        </div>
+                        <div className='text-xl font-bold tracking-tight'>NexSupport <span className='text-indigo-600'>AI</span></div>
+                    </div>
+                    <button 
+                        className='px-5 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm' 
+                        onClick={() => navigate.push("/embed")}
+                    >
+                        Embed ChatBot
+                    </button>
                 </div>
             </motion.div>
 
-            <div className='flex justify-center px-4 py-14 mt-20'>
+            <div className='flex justify-center px-4 py-12 relative z-10'>
                 <motion.div
-                    className='w-full max-w-3xl bg-white rounded-2xl shadow-xl p-10'
-
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className='w-full max-w-3xl'
                 >
-                    <div className='mb-10'>
-                        <h1 className='text-2xl font-semibold'>ChatBot Settings</h1>
-                        <p className='text-zinc-500 mt-1'> Manage your AI chatbot knowledge and business details</p>
+                    <div className='mb-8'>
+                        <h1 className='text-3xl font-bold tracking-tight text-zinc-900'>ChatBot Settings</h1>
+                        <p className='text-zinc-500 mt-2 text-lg'>Manage your AI chatbot knowledge and business details.</p>
                     </div>
 
-                    <div className='mb-10'>
-                        <h1 className='text-lg font-medium mb-4'>Business Details</h1>
-                        <div className='space-y-4'>
-                            <input type="text" className='w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/80' placeholder='Business Name' value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
-                            <input type="text" className='w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/80' placeholder='Support Email' value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} />
+                    <div className="space-y-6">
+                        {/* Business Details Card */}
+                        <div className='bg-white rounded-3xl shadow-sm shadow-zinc-200/50 border border-zinc-200 p-8'>
+                            <h2 className='text-xl font-semibold mb-6 flex items-center gap-2'>
+                                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                Business Details
+                            </h2>
+                            <div className='space-y-5'>
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1.5">Business Name</label>
+                                    <input 
+                                        type="text" 
+                                        className='w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white' 
+                                        placeholder='e.g. Acme Corp' 
+                                        value={businessName} 
+                                        onChange={(e) => setBusinessName(e.target.value)} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1.5">Support Email</label>
+                                    <input 
+                                        type="email" 
+                                        className='w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white' 
+                                        placeholder='support@example.com' 
+                                        value={supportEmail} 
+                                        onChange={(e) => setSupportEmail(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className='mb-10'>
-                        <h1 className='text-lg font-medium mb-4'>Knowledge Base</h1>
-                        <p className='text-sm text-zinc-500 mb-4'>Add FAQs, policies, delivery info, refunds, etc.</p>
-                        <div className='space-y-4'>
-                            <textarea className='w-full h-54 rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/80' placeholder={`Example:
+
+                        {/* Knowledge Base Card */}
+                        <div className='bg-white rounded-3xl shadow-sm shadow-zinc-200/50 border border-zinc-200 p-8'>
+                            <div className="flex items-start justify-between mb-6">
+                                <div>
+                                    <h2 className='text-xl font-semibold flex items-center gap-2'>
+                                        <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                                        Knowledge Base
+                                    </h2>
+                                    <p className='text-sm text-zinc-500 mt-1'>Add plain text FAQs, policies, and operating hours.</p>
+                                </div>
+                            </div>
+                            <div className='space-y-4'>
+                                <textarea 
+                                    className='w-full h-56 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white resize-y' 
+                                    placeholder={`Example:
 • Refund policy: 7 days return available
 • Delivery time: 3–5 working days
 • Cash on Delivery available
-• Support hours`} onChange={(e) => setKnowledge(e.target.value)} value={knowledge} />
+• Support hours: Mon-Fri 9AM-5PM`} 
+                                    onChange={(e) => setKnowledge(e.target.value)} 
+                                    value={knowledge} 
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className='mb-10'>
-                        <h1 className='text-lg font-medium mb-4'>Advanced Knowledge Documents (PDF/Text)</h1>
-                        <p className='text-sm text-zinc-500 mb-4'>Upload PDFs to be processed and searchable by the AI.</p>
-                        <div className='space-y-4 border border-zinc-300 rounded-xl p-4'>
-                            <input type="file" accept=".pdf,.txt" onChange={(e) => setFile(e.target.files?.[0] || null)} className='text-sm' />
-                            <motion.button 
-                                whileHover={{ scale: 1.03 }}
-                                whileTap={{ scale: 0.97 }}
-                                disabled={uploadingDoc || !file}
-                                onClick={handleUpload}
-                                className="px-5 py-2 rounded-lg bg-black text-white text-sm font-medium hover:bg-zinc-800 transition disabled:opacity-60 block"
+                        {/* Document Upload Card */}
+                        <div className='bg-white rounded-3xl shadow-sm shadow-zinc-200/50 border border-zinc-200 p-8'>
+                            <div className="mb-6">
+                                <h2 className='text-xl font-semibold flex items-center gap-2'>
+                                    <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                    Advanced Knowledge Documents
+                                </h2>
+                                <p className='text-sm text-zinc-500 mt-1'>Upload PDFs or Text files for the AI to ingest and search.</p>
+                            </div>
+                            <div className='relative rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center hover:bg-zinc-50 hover:border-indigo-300 transition-colors group'>
+                                <input 
+                                    type="file" 
+                                    accept=".pdf,.txt" 
+                                    onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                                    className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10' 
+                                />
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                    <div className="w-12 h-12 rounded-full bg-white shadow-sm border border-zinc-100 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    </div>
+                                    <div className="text-sm font-medium text-zinc-700">
+                                        {file ? file.name : "Click or drag file to upload"}
+                                    </div>
+                                    <div className="text-xs text-zinc-500">Supports PDF and TXT up to 10MB</div>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-5 flex items-center gap-4">
+                                <button
+                                    disabled={uploadingDoc || !file}
+                                    onClick={handleUpload}
+                                    className="px-6 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-zinc-900/10"
+                                >
+                                    {uploadingDoc ? (
+                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full" />
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                    )}
+                                    {uploadingDoc ? "Processing..." : "Upload & Train"}
+                                </button>
+                                {uploadMsg && (
+                                    <motion.p 
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className={`text-sm font-medium ${uploadMsg.includes("failed") ? "text-red-500" : "text-emerald-600"}`}
+                                    >
+                                        {uploadMsg}
+                                    </motion.p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className='flex items-center gap-5 pt-4'>
+                            <button
+                                disabled={loading}
+                                onClick={handleSettings}
+                                className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all active:scale-95 disabled:opacity-60 flex items-center gap-2"
                             >
-                                {uploadingDoc ? "Processing..." : "Upload & Train"}
-                            </motion.button>
-                            {uploadMsg && <p className='text-sm mt-2 text-zinc-600'>{uploadMsg}</p>}
+                                {loading ? (
+                                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full" />
+                                ) : null}
+                                {loading ? "Saving Changes..." : "Save All Settings"}
+                            </button>
+                            
+                            <AnimatePresence>
+                                {saved && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9, x: -10 }}
+                                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, x: -10 }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200 text-sm font-medium shadow-sm"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                        Settings saved successfully
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
-
-                    <div className='flex items-center gap-5'>
-                        <motion.button
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            disabled={loading}
-                            onClick={handleSettings}
-                            className="px-7 py-3 rounded-xl bg-black text-white text-sm font-medium hover:bg-zinc-800 transition disabled:opacity-60"
-                        >
-                            {loading ? "Saving..." : "Save"}
-
-                        </motion.button>
-                        {saved && <motion.span
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-sm font-medium text-emerald-600"
-                        >
-                            ✓ Settings saved
-                        </motion.span>}
-
-                    </div>
-
-
-
                 </motion.div>
             </div>
-
         </div>
     )
 }

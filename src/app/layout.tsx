@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Support.ai",
+  title: "NexSupport AI",
   description: "the chatbot that you can embed in your website",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
