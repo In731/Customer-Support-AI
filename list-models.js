@@ -1,8 +1,6 @@
 const { GoogleGenAI } = require("@google/genai");
 
 async function listModels() {
-    const ai = new GoogleGenAI({ apiKey: "AQ.Ab8RN6J9hlJ9-djZnQUr_s1seyiJrcj6XYU_TId-KqyXDkS8Fw" });
-    
     try {
         // Since we don't know the exact method in this SDK, we might have to use raw fetch.
         // Let's try raw fetch to Gemini API to list models.
