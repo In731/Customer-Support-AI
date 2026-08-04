@@ -1,8 +1,17 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
+
+type UploadedDocument = {
+    _id: string
+    title: string
+    fileName?: string
+    status: "processing" | "embedded" | "failed"
+    createdAt: string
+    chunkCount: number
+}
 
 function DashboardClient({ ownerId }: { ownerId: string }) {
     const navigate = useRouter()
@@ -11,9 +20,12 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [knowledge, setKnowledge] = useState("")
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
-    const [file, setFile] = useState<File | null>(null)
+    const [files, setFiles] = useState<File[]>([])
+    const [documents, setDocuments] = useState<UploadedDocument[]>([])
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const [uploadingDoc, setUploadingDoc] = useState(false)
     const [uploadMsg, setUploadMsg] = useState("")
+    const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
 
     const handleSettings = async () => {
         setLoading(true)
@@ -41,27 +53,51 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                 }
             }
             handleGetDetails()
+            axios.get("/api/knowledge", { params: { tenantId: ownerId } })
+                .then((result) => setDocuments(result.data))
+                .catch((error) => console.log(error))
         }
     }, [ownerId])
 
     const handleUpload = async () => {
-        if (!file) return;
+        if (files.length === 0) return;
         setUploadingDoc(true);
         setUploadMsg("");
         try {
             const formData = new FormData();
-            formData.append("file", file);
+            files.forEach((file) => formData.append("files", file));
             formData.append("tenantId", ownerId);
             const res = await axios.post("/api/knowledge", formData);
             if (res.data.success) {
-                setUploadMsg("Document uploaded and processed successfully!");
-                setFile(null);
+                setUploadMsg(res.data.message);
+                setFiles([]);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                const documentsResult = await axios.get("/api/knowledge", { params: { tenantId: ownerId } });
+                setDocuments(documentsResult.data);
             }
         } catch (error: any) {
             console.log(error);
             setUploadMsg(error.response?.data?.error || "Upload failed");
         }
         setUploadingDoc(false);
+    }
+
+    const handleDeleteDocument = async (document: UploadedDocument) => {
+        const fileName = document.fileName || document.title;
+        if (!window.confirm(`Remove ${fileName} and all of its knowledge chunks?`)) return;
+
+        setDeletingDocumentId(document._id);
+        setUploadMsg("");
+        try {
+            await axios.delete("/api/knowledge", { data: { documentId: document._id, tenantId: ownerId } });
+            setDocuments((current) => current.filter((item) => item._id !== document._id));
+            setUploadMsg(`${fileName} was removed from the knowledge base.`);
+        } catch (error: any) {
+            console.log(error);
+            setUploadMsg(error.response?.data?.error || "Unable to remove document");
+        } finally {
+            setDeletingDocumentId(null);
+        }
     }
 
     return (
@@ -166,13 +202,15 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                     <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                                     Advanced Knowledge Documents
                                 </h2>
-                                <p className='text-sm text-zinc-500 mt-1'>Upload PDFs or Text files for the AI to ingest and search.</p>
+                                    <p className='text-sm text-zinc-500 mt-1'>Upload one or more PDFs or text files. Every document remains available to the chatbot.</p>
                             </div>
                             <div className='relative rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center hover:bg-zinc-50 hover:border-indigo-300 transition-colors group'>
                                 <input 
                                     type="file" 
                                     accept=".pdf,.txt" 
-                                    onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                                    multiple
+                                    ref={fileInputRef}
+                                    onChange={(e) => setFiles(Array.from(e.target.files || []))}
                                     className='absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10' 
                                 />
                                 <div className="flex flex-col items-center justify-center gap-3">
@@ -180,7 +218,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                     </div>
                                     <div className="text-sm font-medium text-zinc-700">
-                                        {file ? file.name : "Click or drag file to upload"}
+                                        {files.length > 0 ? `${files.length} file${files.length === 1 ? "" : "s"} selected` : "Click or drag files to upload"}
                                     </div>
                                     <div className="text-xs text-zinc-500">Supports PDF and TXT up to 10MB</div>
                                 </div>
@@ -188,7 +226,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                             
                             <div className="mt-5 flex items-center gap-4">
                                 <button
-                                    disabled={uploadingDoc || !file}
+                                    disabled={uploadingDoc || files.length === 0}
                                     onClick={handleUpload}
                                     className="px-6 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-zinc-900/10"
                                 >
@@ -209,6 +247,35 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                     </motion.p>
                                 )}
                             </div>
+
+                            {documents.length > 0 && (
+                                <div className="mt-7 border-t border-zinc-100 pt-6">
+                                    <h3 className="text-sm font-semibold text-zinc-800">Uploaded documents</h3>
+                                    <div className="mt-3 space-y-2">
+                                        {documents.map((document) => (
+                                            <div key={document._id} className="flex items-center justify-between gap-4 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-zinc-800">{document.fileName || document.title}</p>
+                                                    <p className="text-xs text-zinc-500">{document.chunkCount} knowledge chunk{document.chunkCount === 1 ? "" : "s"}</p>
+                                                </div>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${document.status === "embedded" ? "bg-emerald-50 text-emerald-700" : document.status === "failed" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
+                                                        {document.status}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteDocument(document)}
+                                                        disabled={deletingDocumentId === document._id}
+                                                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        {deletingDocumentId === document._id ? "Removing..." : "Remove"}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}

@@ -15,79 +15,144 @@ export async function POST(req: NextRequest) {
     try {
         await connectDB();
         const formData = await req.formData();
-        const file = formData.get("file") as File | null;
         const textSnippet = formData.get("textSnippet") as string | null;
-        // In a real app, this should come from user session
         const tenantId = formData.get("tenantId") as string || "default_tenant";
-
-        let extractedText = "";
-        let title = "Text Snippet";
-        let fileName = undefined;
-
-        if (file) {
-            fileName = file.name;
-            title = file.name;
-            const arrayBuffer = await file.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            if (file.type === "application/pdf") {
-                const pdfData = await pdfParse(buffer);
-                extractedText = pdfData.text;
-            } else if (file.type === "text/plain") {
-                extractedText = buffer.toString('utf-8');
-            } else {
-                return NextResponse.json({ error: "Unsupported file type. Use PDF or TXT." }, { status: 400 });
-            }
-        } else if (textSnippet) {
-            extractedText = textSnippet;
-        } else {
-            return NextResponse.json({ error: "Please provide a file or text snippet." }, { status: 400 });
+        const uploadedFiles = formData.getAll("files").filter((value): value is File => value instanceof File);
+        const legacyFile = formData.get("file");
+        if (uploadedFiles.length === 0 && legacyFile instanceof File) {
+            uploadedFiles.push(legacyFile);
         }
 
-        if (!extractedText || !extractedText.trim()) {
-            return NextResponse.json({ error: "No text found to process." }, { status: 400 });
+        if (uploadedFiles.length === 0 && !textSnippet) {
+            return NextResponse.json({ error: "Please provide at least one PDF, TXT file, or text snippet." }, { status: 400 });
         }
 
-        // 1. Create Document Record
-        const documentRecord = await KnowledgeDocument.create({
-            tenantId,
-            title,
-            fileName,
-            status: "processing"
-        });
+        const sources = uploadedFiles.length > 0
+            ? uploadedFiles.map((file) => ({ file, title: file.name, fileName: file.name }))
+            : [{ file: null, title: "Text Snippet", fileName: undefined }];
+        const documents = [];
 
-        await connectDB();
+        for (const source of sources) {
+            let documentRecord;
+            try {
+                let extractedText = textSnippet || "";
+                if (source.file) {
+                    const buffer = Buffer.from(await source.file.arrayBuffer());
+                    if (source.file.type === "application/pdf") {
+                        extractedText = (await pdfParse(buffer)).text;
+                    } else if (source.file.type === "text/plain") {
+                        extractedText = buffer.toString("utf-8");
+                    } else {
+                        throw new Error(`${source.file.name}: only PDF and TXT files are supported.`);
+                    }
+                }
 
-        // 2. Clear out any old 3072-dimension vectors for this user
-        await KnowledgeChunk.deleteMany({ tenantId });
+                if (!extractedText.trim()) {
+                    throw new Error(`${source.title}: no text found to process.`);
+                }
 
-        // 2. Chunk text
-        const chunks = chunkText(extractedText, 1000, 200);
-
-        // 3. Generate embeddings
-        for (const chunk of chunks) {
-            if (!chunk.trim()) continue;
-            const response = await ai.models.embedContent({
-                model: 'gemini-embedding-001',
-                contents: chunk,
-            });
-            const embedding = response.embeddings?.[0]?.values?.slice(0, 768);
-            if (embedding) {
-                await KnowledgeChunk.create({
-                    documentId: documentRecord._id,
+                documentRecord = await KnowledgeDocument.create({
                     tenantId,
-                    text: chunk,
-                    embedding
+                    title: source.title,
+                    fileName: source.fileName,
+                    status: "processing"
                 });
+
+                const chunks = chunkText(extractedText, 1000, 200);
+                for (const chunk of chunks) {
+                    if (!chunk.trim()) continue;
+                    const response = await ai.models.embedContent({
+                        model: "gemini-embedding-001",
+                        contents: chunk,
+                    });
+                    const embedding = response.embeddings?.[0]?.values?.slice(0, 768);
+                    if (embedding) {
+                        await KnowledgeChunk.create({
+                            documentId: documentRecord._id,
+                            tenantId,
+                            text: chunk,
+                            embedding
+                        });
+                    }
+                }
+
+                documentRecord.status = "embedded";
+                await documentRecord.save();
+                documents.push({ id: documentRecord._id, title: documentRecord.title, status: documentRecord.status });
+            } catch (error: any) {
+                if (documentRecord) {
+                    documentRecord.status = "failed";
+                    await documentRecord.save();
+                }
+                return NextResponse.json({ error: error.message || "Failed to ingest knowledge" }, { status: 400 });
             }
         }
 
-        documentRecord.status = "embedded";
-        await documentRecord.save();
-
-        return NextResponse.json({ success: true, message: "Knowledge ingested successfully.", documentId: documentRecord._id });
+        return NextResponse.json({ success: true, message: `${documents.length} document(s) uploaded and processed successfully.`, documents });
     } catch (error: any) {
         console.error("Ingestion error:", error);
         return NextResponse.json({ error: error.message || "Failed to ingest knowledge" }, { status: 500 });
+    }
+}
+
+export async function GET(req: NextRequest) {
+    try {
+        const tenantId = new URL(req.url).searchParams.get("tenantId");
+        if (!tenantId) {
+            return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
+        }
+
+        await connectDB();
+        const documents = await KnowledgeDocument.aggregate([
+            { $match: { tenantId } },
+            {
+                $lookup: {
+                    from: "knowledgechunks",
+                    let: { documentId: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$documentId", "$$documentId"] } } },
+                        { $count: "count" }
+                    ],
+                    as: "chunkStats"
+                }
+            },
+            {
+                $project: {
+                    title: 1,
+                    fileName: 1,
+                    status: 1,
+                    createdAt: 1,
+                    chunkCount: { $ifNull: [{ $arrayElemAt: ["$chunkStats.count", 0] }, 0] }
+                }
+            },
+            { $sort: { createdAt: -1 } }
+        ]);
+
+        return NextResponse.json(documents);
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message || "Failed to load documents" }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { documentId, tenantId } = await req.json();
+        if (!documentId || !tenantId) {
+            return NextResponse.json({ error: "documentId and tenantId are required" }, { status: 400 });
+        }
+
+        await connectDB();
+        const document = await KnowledgeDocument.findOne({ _id: documentId, tenantId });
+        if (!document) {
+            return NextResponse.json({ error: "Document not found" }, { status: 404 });
+        }
+
+        await KnowledgeChunk.deleteMany({ documentId: document._id, tenantId });
+        await KnowledgeDocument.deleteOne({ _id: document._id });
+
+        return NextResponse.json({ success: true, message: "Document removed from the knowledge base." });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message || "Failed to remove document" }, { status: 500 });
     }
 }
 
