@@ -11,12 +11,19 @@ async function connectDB() {
     await mongoose.connect(process.env.MONGODB_URL as string, { family: 4 });
 }
 
+import { getSession } from "@/lib/getSession";
+
 export async function POST(req: NextRequest) {
     try {
+        const sessionData = await getSession();
+        const tenantId = (sessionData as any)?.user?.id;
+        if (!tenantId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         await connectDB();
         const formData = await req.formData();
         const textSnippet = formData.get("textSnippet") as string | null;
-        const tenantId = formData.get("tenantId") as string || "default_tenant";
         const uploadedFiles = formData.getAll("files").filter((value): value is File => value instanceof File);
         const legacyFile = formData.get("file");
         if (uploadedFiles.length === 0 && legacyFile instanceof File) {
@@ -97,9 +104,10 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     try {
-        const tenantId = new URL(req.url).searchParams.get("tenantId");
+        const sessionData = await getSession();
+        const tenantId = (sessionData as any)?.user?.id;
         if (!tenantId) {
-            return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         await connectDB();
@@ -136,9 +144,15 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
-        const { documentId, tenantId } = await req.json();
-        if (!documentId || !tenantId) {
-            return NextResponse.json({ error: "documentId and tenantId are required" }, { status: 400 });
+        const sessionData = await getSession();
+        const tenantId = (sessionData as any)?.user?.id;
+        if (!tenantId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { documentId } = await req.json();
+        if (!documentId) {
+            return NextResponse.json({ error: "documentId is required" }, { status: 400 });
         }
 
         await connectDB();

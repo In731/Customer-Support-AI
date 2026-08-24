@@ -3,6 +3,14 @@ import Settings from "@/model/settings.model";
 import { KnowledgeChunk } from "@/model/knowledge.model";
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+const ratelimit = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(15, "1 m"), // 15 requests per minute per IP to match Gemini Free Tier
+    analytics: true,
+});
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,6 +21,18 @@ export async function POST(req: NextRequest) {
                 { status: 400 }
             )
         }
+
+        // Apply rate limiting
+        const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
+        const { success } = await ratelimit.limit(ip);
+        if (!success) {
+            const res = NextResponse.json({ message: "Too many requests" }, { status: 429 });
+            res.headers.set("Access-Control-Allow-Origin", "*");
+            res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.headers.set("Access-Control-Allow-Headers", "Content-Type");
+            return res;
+        }
+
         await connectDb()
         const setting = await Settings.findOne({ ownerId })
         if (!setting) {
