@@ -1,5 +1,4 @@
 (async function () {
-
     const api_Url = "https://customer-support-ai-blush-two.vercel.app/api/chat"
     
     const scriptTag = document.currentScript;
@@ -12,8 +11,8 @@
 
     const public_api_url = "https://customer-support-ai-blush-two.vercel.app/api/settings/public?ownerId=" + ownerId;
     let config = {
-        primaryColor: "#000000",
-        widgetIcon: "🤖",
+        primaryColor: "#0f172a", // slate-900 default
+        widgetIcon: "💬",
         welcomeMessage: "Hi! How can I help you today?",
         businessName: "Customer Support"
     };
@@ -27,133 +26,214 @@
         console.error("Failed to load widget config", e);
     }
 
+    // Modern Lucide Icons
+    const sendIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>`;
+    const closeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
+
+    const fontStyle = "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+
+    // Create Floating Button
     const button = document.createElement("div")
     button.textContent = config.widgetIcon;
-
     Object.assign(button.style, {
         position: "fixed",
         bottom: "24px",
         right: "24px",
-        width: "56px",
-        height: "56px",
-        borderRadius: "50%",
+        width: "60px",
+        height: "60px",
+        borderRadius: "9999px",
         background: config.primaryColor,
-        color: "#fff",
+        color: "#ffffff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
-        fontSize: "22px",
-        boxShadow: "0 15px 40px rgba(0,0,0,0.35)",
+        fontSize: "28px",
+        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
         zIndex: "999999",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        fontFamily: fontStyle
     })
-
+    
+    button.onmouseover = () => button.style.transform = "scale(1.05)";
+    button.onmouseout = () => button.style.transform = "scale(1)";
     document.body.appendChild(button)
 
+    // Create Chat Box
     const box = document.createElement("div")
     Object.assign(box.style, {
         position: "fixed",
-        bottom: "90px",
+        bottom: "100px",
         right: "24px",
-        width: "320px",
-        height: "420px",
-        background: "#fff",
-        borderRadius: "14px",
-        boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
+        width: "360px",
+        height: "500px",
+        background: "#ffffff",
+        borderRadius: "12px",
+        border: "1px solid #e4e4e7",
+        boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
         display: "none",
         flexDirection: "column",
         overflow: "hidden",
         zIndex: "999999",
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: fontStyle,
+        opacity: "0",
+        transform: "translateY(10px)",
+        transition: "opacity 0.2s ease, transform 0.2s ease"
     })
 
-    box.innerHTML = `<div style="
-      background:${config.primaryColor};
-      color:#fff;
-      padding:12px 14px;
-      font-size:14px;
+    box.innerHTML = `
+    <!-- Header -->
+    <div style="
+      background:#ffffff;
+      color:#09090b;
+      padding:16px 20px;
+      font-size:16px;
+      font-weight:600;
       display:flex;
       justify-content:space-between;
       align-items:center;
+      border-bottom:1px solid #e4e4e7;
     ">
-    <span>${config.businessName}</span>
-     <span id="chat-close" style="cursor:pointer;font-size:16px">╳</span>
+        <div style="display:flex; flex-direction:column; gap:2px;">
+            <span>${config.businessName}</span>
+            <span style="font-size:12px; font-weight:400; color:#71717a;">Online</span>
+        </div>
+        <button id="chat-close" style="
+            background:transparent;
+            border:none;
+            color:#71717a;
+            cursor:pointer;
+            padding:4px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:6px;
+            transition:background 0.2s;
+        " onmouseover="this.style.background='#f4f4f5'" onmouseout="this.style.background='transparent'">
+            ${closeIcon}
+        </button>
     </div>
 
+    <!-- Messages Area -->
     <div id="chat-messages" style="
       flex:1;
-      padding:12px;
+      padding:20px;
       overflow-y:auto;
-      background:#f9fafb;
+      background:#ffffff;
       display:flex;
       flex-direction:column;
+      gap:16px;
     "></div>
 
+    <!-- Input Area -->
     <div style="
       display:flex;
-      border-top:1px solid #e5e7eb;
-      padding:8px;
-      gap:6px;
+      padding:16px;
+      gap:12px;
+      border-top:1px solid #e4e4e7;
+      background:#ffffff;
     ">
     <input id="chat-input" type="text" 
     style="
           flex:1;
-          padding:8px 10px;
-          border:1px solid #d1d5db;
-          border-radius:8px;
-          font-size:13px;
+          padding:10px 16px;
+          border:1px solid #e4e4e7;
+          border-radius:9999px;
+          font-size:14px;
           outline:none;
+          transition:border-color 0.2s;
+          background:#f4f4f5;
+          color:#09090b;
         "
-         placeholder="Type a message"/>
-    <button id="chat-send" style="padding:8px 12px;
+         placeholder="Type your message..."/>
+    <button id="chat-send" style="
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          width:40px;
+          height:40px;
           border:none;
           background:${config.primaryColor};
-          color:#fff;
-          border-radius:8px;
-          font-size:13px;
+          color:#ffffff;
+          border-radius:9999px;
           cursor:pointer;
-        ">send</button>
+          transition:opacity 0.2s;
+        " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+          ${sendIcon}
+        </button>
     </div>
-    
     `
 
     document.body.appendChild(box)
 
+    const input = document.querySelector("#chat-input")
+    input.onfocus = () => input.style.border = "1px solid #a1a1aa";
+    input.onblur = () => input.style.border = "1px solid #e4e4e7";
+
     button.onclick = () => {
-        box.style.display = box.style.display === "none" ? "flex" : "none"
+        if (box.style.display === "none") {
+            box.style.display = "flex"
+            // Trigger reflow for animation
+            setTimeout(() => {
+                box.style.opacity = "1"
+                box.style.transform = "translateY(0)"
+            }, 10)
+        } else {
+            box.style.opacity = "0"
+            box.style.transform = "translateY(10px)"
+            setTimeout(() => {
+                box.style.display = "none"
+            }, 200) // Match transition duration
+        }
     }
 
     document.querySelector("#chat-close").onclick = () => {
-        box.style.display = "none"
+        box.style.opacity = "0"
+        box.style.transform = "translateY(10px)"
+        setTimeout(() => {
+            box.style.display = "none"
+        }, 200)
     }
 
-
-    const input = document.querySelector("#chat-input")
     const sendBtn = document.querySelector("#chat-send")
     const messageArea = document.querySelector("#chat-messages")
 
     function addMessage(text, from) {
+        const bubbleContainer = document.createElement("div")
+        Object.assign(bubbleContainer.style, {
+            display: "flex",
+            width: "100%",
+            justifyContent: from === "user" ? "flex-end" : "flex-start",
+        })
+
         const bubble = document.createElement("div")
         bubble.textContent = text; // XSS PATCH: Using textContent instead of innerHTML
         Object.assign(bubble.style, {
-            maxWidth: "78%",
-            padding: "8px 12px",
-            borderRadius: "14px",
-            fontSize: "13px",
-            lineHeight: "1.4",
-            marginBottom: "8px",
-            alignSelf: from === "user" ? "flex-end" : "flex-start",
-            background: from === "user" ? config.primaryColor : "#e5e7eb",
-            color: from === "user" ? "#fff" : "#111",
-
-            /* bubble direction polish */
-            borderTopRightRadius: from === "user" ? "4px" : "14px",
-            borderTopLeftRadius: from === "user" ? "14px" : "4px",
+            maxWidth: "85%",
+            padding: "10px 16px",
+            fontSize: "14px",
+            lineHeight: "1.5",
+            wordBreak: "break-word",
+            
+            // Shadcn specific aesthetic
+            borderRadius: "16px",
+            background: from === "user" ? config.primaryColor : "#f4f4f5",
+            color: from === "user" ? "#ffffff" : "#09090b",
+            borderBottomRightRadius: from === "user" ? "4px" : "16px",
+            borderBottomLeftRadius: from === "user" ? "16px" : "4px",
         })
-        messageArea.appendChild(bubble)
-        messageArea.scrollTop = messageArea.scrollHeight
 
+        bubbleContainer.appendChild(bubble)
+        messageArea.appendChild(bubbleContainer)
+        messageArea.scrollTop = messageArea.scrollHeight
     }
+
+    // Allow Enter key to send
+    input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            sendBtn.click();
+        }
+    })
 
     // Insert welcome message
     if (config.welcomeMessage) {
@@ -168,16 +248,38 @@
         addMessage(text, "user")
         input.value = ""
 
-        const typing = document.createElement("div")
-        typing.textContent = "Typing..."
-        Object.assign(typing.style, {
-            fontSize: "12px",
-            color: "#6b7280",
-            marginBottom: "8px",
-            alignSelf: "flex-start",
+        const typingContainer = document.createElement("div")
+        Object.assign(typingContainer.style, {
+            display: "flex",
+            width: "100%",
+            justifyContent: "flex-start",
         })
-        messageArea.appendChild(typing)
+
+        const typing = document.createElement("div")
+        typing.innerHTML = `<span style="display:flex;gap:4px;align-items:center;height:20px;">
+            <span style="width:6px;height:6px;background:#a1a1aa;border-radius:50%;animation:bounce 1.4s infinite ease-in-out both;"></span>
+            <span style="width:6px;height:6px;background:#a1a1aa;border-radius:50%;animation:bounce 1.4s infinite ease-in-out both;animation-delay:0.16s;"></span>
+            <span style="width:6px;height:6px;background:#a1a1aa;border-radius:50%;animation:bounce 1.4s infinite ease-in-out both;animation-delay:0.32s;"></span>
+        </span>`
+        Object.assign(typing.style, {
+            padding: "10px 16px",
+            background: "#f4f4f5",
+            borderRadius: "16px",
+            borderBottomLeftRadius: "4px"
+        })
+        
+        // Add tiny CSS animation for typing dots dynamically
+        if(!document.getElementById('chatbot-typing-css')) {
+            const style = document.createElement('style');
+            style.id = 'chatbot-typing-css';
+            style.innerHTML = `@keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }`;
+            document.head.appendChild(style);
+        }
+
+        typingContainer.appendChild(typing)
+        messageArea.appendChild(typingContainer)
         messageArea.scrollTop = messageArea.scrollHeight
+
         try {
             const response = await fetch(api_Url, {
                 method: "POST",
@@ -188,7 +290,7 @@
             })
 
             const data = await response.json()
-            messageArea.removeChild(typing)
+            messageArea.removeChild(typingContainer)
 
             if (response.ok) {
                 addMessage(data || "something went wrong", "ai")
@@ -198,8 +300,8 @@
 
         } catch (error) {
             console.log(error)
-            messageArea.removeChild(typing)
-            addMessage("Network error or server unavailable", "ai") // FATAL CRASH PATCH: data is not defined here
+            messageArea.removeChild(typingContainer)
+            addMessage("Network error or server unavailable", "ai")
         }
     }
 })()
