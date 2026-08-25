@@ -26,8 +26,8 @@
         console.error("Failed to load widget config", e);
     }
 
-    // Modern Lucide Icons
-    const sendIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display: block;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`;
+    // Modern Icons
+    const sendIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${config.primaryColor}" style="display: block; margin-left: 4px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>`;
     const closeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;
 
     const fontStyle = "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
@@ -132,32 +132,34 @@
       gap:12px;
       border-top:1px solid #e4e4e7;
       background:#ffffff;
+      align-items:center;
     ">
     <input id="chat-input" type="text" 
     style="
           flex:1;
-          padding:10px 16px;
+          padding:12px 16px;
           border:1px solid #e4e4e7;
-          border-radius:9999px;
-          font-size:14px;
+          border-radius:24px;
+          font-size:15px;
           outline:none;
           transition:border-color 0.2s;
-          background:#f4f4f5;
+          background:#f0f2f5;
           color:#09090b;
         "
-         placeholder="Type your message..."/>
+         placeholder="Type a message"/>
     <button id="chat-send" style="
           display:flex;
           align-items:center;
           justify-content:center;
-          width:40px;
-          height:40px;
+          width:44px;
+          height:44px;
           border:none;
           background:transparent;
-          color:${config.primaryColor};
+          border-radius:50%;
           cursor:pointer;
-          transition:opacity 0.2s;
-        " onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+          padding:0;
+          transition:background 0.2s;
+        " onmouseover="this.style.background='#f4f4f5'" onmouseout="this.style.background='transparent'">
           ${sendIcon}
         </button>
     </div>
