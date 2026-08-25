@@ -153,12 +153,11 @@
           width:40px;
           height:40px;
           border:none;
-          background:${config.primaryColor};
-          color:#ffffff;
-          border-radius:9999px;
+          background:transparent;
+          color:${config.primaryColor};
           cursor:pointer;
           transition:opacity 0.2s;
-        " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        " onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
           ${sendIcon}
         </button>
     </div>
