@@ -396,6 +396,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                 )}
                             </AnimatePresence>
                         </div>
+                    </div>
                     )}
 
                     {activeTab === 'insights' && (
