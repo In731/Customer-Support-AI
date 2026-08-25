@@ -30,6 +30,12 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [uploadMsg, setUploadMsg] = useState("")
     const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
 
+    // Analytics State
+    const [activeTab, setActiveTab] = useState<"settings" | "insights">("settings")
+    const [metrics, setMetrics] = useState<any[]>([])
+    const [unanswered, setUnanswered] = useState<any[]>([])
+    const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+
     const handleSettings = async () => {
         setLoading(true)
         try {
@@ -64,6 +70,19 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                 .catch((error) => console.log(error))
         }
     }, [ownerId])
+
+    useEffect(() => {
+        if (ownerId && activeTab === 'insights') {
+            setLoadingAnalytics(true)
+            axios.get("/api/analytics", { params: { tenantId: ownerId } })
+                .then(res => {
+                    setMetrics(res.data.metrics || [])
+                    setUnanswered(res.data.unanswered || [])
+                })
+                .catch(err => console.log(err))
+                .finally(() => setLoadingAnalytics(false))
+        }
+    }, [ownerId, activeTab])
 
     const handleUpload = async () => {
         if (files.length === 0) return;
@@ -141,11 +160,27 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                     className='w-full max-w-3xl'
                 >
                     <div className='mb-8'>
-                        <h1 className='text-3xl font-bold tracking-tight text-zinc-900'>ChatBot Settings</h1>
-                        <p className='text-zinc-500 mt-2 text-lg'>Manage your AI chatbot knowledge and business details.</p>
+                        <h1 className='text-3xl font-bold tracking-tight text-zinc-900'>Dashboard</h1>
+                        <p className='text-zinc-500 mt-2 text-lg'>Manage your AI chatbot knowledge and monitor its performance.</p>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className='flex space-x-6 mb-8 border-b border-zinc-200'>
+                        <button 
+                            onClick={() => setActiveTab("settings")} 
+                            className={`pb-3 text-lg font-medium border-b-2 transition-colors ${activeTab === 'settings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+                        >
+                            Settings & Knowledge
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab("insights")} 
+                            className={`pb-3 text-lg font-medium border-b-2 transition-colors ${activeTab === 'insights' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+                        >
+                            Insights & Analytics
+                        </button>
+                    </div>
+
+                    {activeTab === 'settings' && (
+                        <div className="space-y-6">
                         {/* Business Details Card */}
                         <div className='bg-white rounded-3xl shadow-sm shadow-zinc-200/50 border border-zinc-200 p-8'>
                             <h2 className='text-xl font-semibold mb-6 flex items-center gap-2'>
@@ -361,7 +396,55 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                 )}
                             </AnimatePresence>
                         </div>
-                    </div>
+                    )}
+
+                    {activeTab === 'insights' && (
+                        <div className="space-y-6">
+                            <div className='grid grid-cols-3 gap-6'>
+                                <div className='bg-white p-6 rounded-3xl shadow-sm border border-zinc-200'>
+                                    <div className='text-sm text-zinc-500 font-medium mb-1'>Total Queries (30d)</div>
+                                    <div className='text-3xl font-bold text-zinc-900'>{metrics.reduce((acc, curr) => acc + curr.totalQueries, 0)}</div>
+                                </div>
+                                <div className='bg-white p-6 rounded-3xl shadow-sm border border-zinc-200'>
+                                    <div className='text-sm text-zinc-500 font-medium mb-1'>Deflected</div>
+                                    <div className='text-3xl font-bold text-emerald-600'>{metrics.reduce((acc, curr) => acc + curr.deflectedQueries, 0)}</div>
+                                </div>
+                                <div className='bg-white p-6 rounded-3xl shadow-sm border border-zinc-200'>
+                                    <div className='text-sm text-zinc-500 font-medium mb-1'>Unanswered</div>
+                                    <div className='text-3xl font-bold text-amber-500'>{metrics.reduce((acc, curr) => acc + curr.escalatedQueries, 0)}</div>
+                                </div>
+                            </div>
+
+                            <div className='bg-white rounded-3xl shadow-sm border border-zinc-200 p-8 mt-6'>
+                                <h2 className='text-xl font-semibold mb-2 flex items-center gap-2'>
+                                    <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Knowledge Gaps
+                                </h2>
+                                <p className='text-sm text-zinc-500 mb-6'>These are questions your customers asked recently that the bot couldn't answer. Add information covering these topics to your Knowledge Base.</p>
+                                
+                                {loadingAnalytics ? (
+                                    <div className="flex justify-center p-8">
+                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full" />
+                                    </div>
+                                ) : unanswered.length === 0 ? (
+                                    <div className='text-center p-12 text-zinc-500 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200'>
+                                        <div className="text-4xl mb-3">🎉</div>
+                                        <div className="font-medium text-zinc-700">No unanswered questions!</div>
+                                        <div className="text-sm mt-1">Your knowledge base is performing perfectly.</div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {unanswered.map((u, i) => (
+                                            <div key={i} className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/50 flex justify-between items-center hover:bg-zinc-50 transition-colors">
+                                                <span className="font-medium text-zinc-800 text-sm">"{u.question}"</span>
+                                                <span className="text-xs font-medium text-zinc-400 bg-white px-2 py-1 rounded-md border border-zinc-100">{new Date(u.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </div>

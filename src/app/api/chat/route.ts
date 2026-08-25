@@ -1,6 +1,7 @@
 import connectDb from "@/lib/db";
 import Settings from "@/model/settings.model";
 import { KnowledgeChunk } from "@/model/knowledge.model";
+import { DailyAnalytics, UnansweredQuery } from "@/model/analytics.model";
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
@@ -62,11 +63,9 @@ export async function POST(req: NextRequest) {
                         queryVector: queryEmbedding,
                         numCandidates: 100,
                         limit: 3,
-                        // If you are using dedicated clusters, you can uncomment the filter line. For shared tier clusters (M0), filtering inside vectorSearch is limited.
-                        // filter: { tenantId: ownerId } 
+                        filter: { tenantId: ownerId } 
                     }
                 },
-                { $match: { tenantId: ownerId } }, // Enforce tenant filter after search if M0 tier is used
                 {
                     $project: {
                         text: 1,
@@ -86,15 +85,13 @@ export async function POST(req: NextRequest) {
         ${additionalKnowledge}
         `
 
-
         const prompt = `
 You are a professional customer support assistant for this business.
 
 Use ONLY the information provided below to answer the customer's question.
 You may rephrase, summarize, or interpret the information if needed.
 Do NOT invent new policies, prices, or promises.
-
-
+If you cannot answer the question based on the information provided, reply EXACTLY with: "I'm sorry, I don't have that information in my knowledge base. Please contact our human support team at ${setting.supportEmail || "our support email"} for further assistance. Is there anything else I can help you with today?"
 
 --------------------
 BUSINESS INFORMATION
@@ -116,7 +113,34 @@ ANSWER
             contents: prompt,
         });
 
-        const response = NextResponse.json(res.text)
+        const responseText = res.text || "I'm sorry, I don't have that information in my knowledge base.";
+        const isEscalated = responseText.includes("I'm sorry, I don't have that information in my knowledge base.");
+        const dateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+        // Asynchronously log analytics so we don't block the response
+        (async () => {
+            try {
+                await DailyAnalytics.findOneAndUpdate(
+                    { ownerId, date: dateStr },
+                    { 
+                        $inc: { 
+                            totalQueries: 1, 
+                            deflectedQueries: isEscalated ? 0 : 1,
+                            escalatedQueries: isEscalated ? 1 : 0
+                        } 
+                    },
+                    { upsert: true }
+                );
+
+                if (isEscalated) {
+                    await UnansweredQuery.create({ ownerId, question: message });
+                }
+            } catch (err) {
+                console.error("Analytics Logging Error:", err);
+            }
+        })();
+
+        const response = NextResponse.json(responseText)
         response.headers.set("Access-Control-Allow-Origin", "*");
         response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type");

@@ -3,6 +3,7 @@ import { KnowledgeDocument, KnowledgeChunk } from "@/model/knowledge.model";
 import mongoose from "mongoose";
 import pdfParse from "pdf-parse";
 import { GoogleGenAI } from "@google/genai";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -39,6 +40,12 @@ export async function POST(req: NextRequest) {
             : [{ file: null, title: "Text Snippet", fileName: undefined }];
         const documents = [];
 
+        // Configure LangChain Splitter
+        const splitter = new RecursiveCharacterTextSplitter({
+            chunkSize: 1000,
+            chunkOverlap: 200,
+        });
+
         for (const source of sources) {
             let documentRecord;
             try {
@@ -65,7 +72,9 @@ export async function POST(req: NextRequest) {
                     status: "processing"
                 });
 
-                const chunks = chunkText(extractedText, 1000, 200);
+                // Generate highly contextual chunks using LangChain
+                const chunks = await splitter.splitText(extractedText);
+                
                 for (const chunk of chunks) {
                     if (!chunk.trim()) continue;
                     const response = await ai.models.embedContent({
@@ -168,14 +177,4 @@ export async function DELETE(req: NextRequest) {
     } catch (error: any) {
         return NextResponse.json({ error: error.message || "Failed to remove document" }, { status: 500 });
     }
-}
-
-function chunkText(text: string, chunkSize: number, overlap: number) {
-    const chunks = [];
-    let i = 0;
-    while (i < text.length) {
-        chunks.push(text.slice(i, i + chunkSize));
-        i += chunkSize - overlap;
-    }
-    return chunks;
 }
