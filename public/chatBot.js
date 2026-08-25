@@ -1,6 +1,14 @@
 (async function () {
-    const api_Url = "https://customer-support-ai-blush-two.vercel.app/api/chat"
+    // --- API URLs ---
+    // Uncomment the one you are currently using:
+
+    // 1. Local Development
+    // const baseUrl = "http://localhost:3000";
     
+    // 2. Production (Vercel)
+    const baseUrl = "https://customer-support-ai-blush-two.vercel.app";
+
+    const api_Url = `${baseUrl}/api/chat`;
     const scriptTag = document.currentScript;
     const ownerId = scriptTag.getAttribute("data-owner-id")
 
@@ -9,7 +17,7 @@
         return
     }
 
-    const public_api_url = "https://customer-support-ai-blush-two.vercel.app/api/settings/public?ownerId=" + ownerId;
+    const public_api_url = `${baseUrl}/api/settings/public?ownerId=` + ownerId;
     let config = {
         primaryColor: "#0f172a", // slate-900 default
         widgetIcon: "💬",
