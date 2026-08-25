@@ -28,14 +28,22 @@ NexSupport AI implements strict, enterprise-grade security controls:
 
 ## 🛠️ Tech Stack
 
-* **Frontend:** Next.js (App Router), React, TailwindCSS, Framer Motion
-* **Backend:** Next.js Serverless API Routes
-* **Testing:** Vitest
-* **Authentication:** Scalekit SDK
-* **Database & Vector Store:** MongoDB & MongoDB Atlas Vector Search (768 dimensions)
-* **Rate Limiting:** Upstash Redis (`@upstash/ratelimit`)
-* **AI & NLP:** Google Gemini API (`@google/genai`) and LangChain Text Splitters
-* **File Processing:** `pdf-parse`
+### Frontend
+- **Framework:** Next.js (App Router) & React
+- **Styling:** TailwindCSS & Framer Motion
+- **Widget:** Vanilla JS (`chatBot.js`) for lightweight cross-origin embedding
+
+### Backend & Infrastructure
+- **API Engine:** Next.js Serverless API Routes
+- **Database:** MongoDB
+- **Vector Search:** MongoDB Atlas Vector Search (Cosine Similarity, 768 dimensions)
+- **Authentication:** Scalekit SDK (B2B Multi-Tenant Auth)
+- **Rate Limiting:** Upstash Serverless Redis (Sliding Window Algorithm)
+
+### AI & Testing
+- **LLM Engine:** Google Gemini (`gemini-3.5-flash` for chat, `gemini-embedding-001` for vectors)
+- **NLP Processing:** LangChain (`RecursiveCharacterTextSplitter`) & `pdf-parse`
+- **Testing:** Vitest (Automated unit testing for AI chunking and CORS rules)
 
 ---
 
