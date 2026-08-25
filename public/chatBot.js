@@ -1,7 +1,7 @@
-(function () {
+(async function () {
 
     const api_Url = "https://customer-support-ai-blush-two.vercel.app/api/chat"
-
+    
     const scriptTag = document.currentScript;
     const ownerId = scriptTag.getAttribute("data-owner-id")
 
@@ -10,8 +10,25 @@
         return
     }
 
+    const public_api_url = "https://customer-support-ai-blush-two.vercel.app/api/settings/public?ownerId=" + ownerId;
+    let config = {
+        primaryColor: "#000000",
+        widgetIcon: "🤖",
+        welcomeMessage: "Hi! How can I help you today?",
+        businessName: "Customer Support"
+    };
+
+    try {
+        const res = await fetch(public_api_url);
+        if (res.ok) {
+            config = await res.json();
+        }
+    } catch (e) {
+        console.error("Failed to load widget config", e);
+    }
+
     const button = document.createElement("div")
-    button.innerHTML = "🤖"
+    button.textContent = config.widgetIcon;
 
     Object.assign(button.style, {
         position: "fixed",
@@ -20,7 +37,7 @@
         width: "56px",
         height: "56px",
         borderRadius: "50%",
-        background: "#000",
+        background: config.primaryColor,
         color: "#fff",
         display: "flex",
         alignItems: "center",
@@ -51,7 +68,7 @@
     })
 
     box.innerHTML = `<div style="
-      background:#000;
+      background:${config.primaryColor};
       color:#fff;
       padding:12px 14px;
       font-size:14px;
@@ -59,7 +76,7 @@
       justify-content:space-between;
       align-items:center;
     ">
-    <span>Customer Support</span>
+    <span>${config.businessName}</span>
      <span id="chat-close" style="cursor:pointer;font-size:16px">╳</span>
     </div>
 
@@ -78,7 +95,7 @@
       padding:8px;
       gap:6px;
     ">
-    <input id="chat-input" type:"text" 
+    <input id="chat-input" type="text" 
     style="
           flex:1;
           padding:8px 10px;
@@ -90,7 +107,7 @@
          placeholder="Type a message"/>
     <button id="chat-send" style="padding:8px 12px;
           border:none;
-          background:#000;
+          background:${config.primaryColor};
           color:#fff;
           border-radius:8px;
           font-size:13px;
@@ -117,7 +134,7 @@
 
     function addMessage(text, from) {
         const bubble = document.createElement("div")
-        bubble.innerHTML = text
+        bubble.textContent = text; // XSS PATCH: Using textContent instead of innerHTML
         Object.assign(bubble.style, {
             maxWidth: "78%",
             padding: "8px 12px",
@@ -126,7 +143,7 @@
             lineHeight: "1.4",
             marginBottom: "8px",
             alignSelf: from === "user" ? "flex-end" : "flex-start",
-            background: from === "user" ? "#000" : "#e5e7eb",
+            background: from === "user" ? config.primaryColor : "#e5e7eb",
             color: from === "user" ? "#fff" : "#111",
 
             /* bubble direction polish */
@@ -138,6 +155,11 @@
 
     }
 
+    // Insert welcome message
+    if (config.welcomeMessage) {
+        addMessage(config.welcomeMessage, "ai");
+    }
+
     sendBtn.onclick = async () => {
         const text = input.value.trim()
         if (!text) {
@@ -147,7 +169,7 @@
         input.value = ""
 
         const typing = document.createElement("div")
-        typing.innerHTML = "Typing..."
+        typing.textContent = "Typing..."
         Object.assign(typing.style, {
             fontSize: "12px",
             color: "#6b7280",
@@ -177,12 +199,7 @@
         } catch (error) {
             console.log(error)
             messageArea.removeChild(typing)
-            addMessage(data || "something went wrong", "ai")
+            addMessage("Network error or server unavailable", "ai") // FATAL CRASH PATCH: data is not defined here
         }
     }
-
-
-
-
-
 })()

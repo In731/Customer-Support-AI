@@ -5,6 +5,9 @@ interface ISettings{
     businessName:string
     supportEmail:string
     knowledge:string
+    primaryColor?:string
+    widgetIcon?:string
+    welcomeMessage?:string
 }
 
 const settingsSchema=new Schema<ISettings>({
@@ -22,6 +25,18 @@ const settingsSchema=new Schema<ISettings>({
   knowledge:{
     type:String
  },
+  primaryColor:{
+    type:String,
+    default:"#000000"
+  },
+  widgetIcon:{
+    type:String,
+    default:"🤖"
+  },
+  welcomeMessage:{
+    type:String,
+    default:"Hi! How can I help you today?"
+  },
 
 
 },{timestamps:true})

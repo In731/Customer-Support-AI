@@ -18,6 +18,9 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [businessName, setBusinessName] = useState("")
     const [supportEmail, setSupportEmail] = useState("")
     const [knowledge, setKnowledge] = useState("")
+    const [primaryColor, setPrimaryColor] = useState("#000000")
+    const [widgetIcon, setWidgetIcon] = useState("🤖")
+    const [welcomeMessage, setWelcomeMessage] = useState("Hi! How can I help you today?")
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
     const [files, setFiles] = useState<File[]>([])
@@ -30,7 +33,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const handleSettings = async () => {
         setLoading(true)
         try {
-            await axios.post("/api/settings", { ownerId, businessName, supportEmail, knowledge })
+            await axios.post("/api/settings", { ownerId, businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage })
             setLoading(false)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
@@ -48,6 +51,9 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                     setBusinessName(result.data.businessName || "")
                     setSupportEmail(result.data.supportEmail || "")
                     setKnowledge(result.data.knowledge || "")
+                    setPrimaryColor(result.data.primaryColor || "#000000")
+                    setWidgetIcon(result.data.widgetIcon || "🤖")
+                    setWelcomeMessage(result.data.welcomeMessage || "Hi! How can I help you today?")
                 } catch (error) {
                     console.log(error)
                 }
@@ -166,6 +172,56 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                         value={supportEmail} 
                                         onChange={(e) => setSupportEmail(e.target.value)} 
                                     />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Widget Appearance Card */}
+                        <div className='bg-white rounded-3xl shadow-sm shadow-zinc-200/50 border border-zinc-200 p-8'>
+                            <h2 className='text-xl font-semibold mb-6 flex items-center gap-2'>
+                                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+                                Widget Appearance
+                            </h2>
+                            <div className='space-y-5'>
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1.5">Primary Brand Color</label>
+                                    <div className="flex items-center gap-3">
+                                        <input 
+                                            type="color" 
+                                            className='w-12 h-12 rounded-xl cursor-pointer border-0 bg-transparent' 
+                                            value={primaryColor} 
+                                            onChange={(e) => setPrimaryColor(e.target.value)} 
+                                        />
+                                        <input 
+                                            type="text"
+                                            className='w-32 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50' 
+                                            value={primaryColor}
+                                            onChange={(e) => setPrimaryColor(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className='grid grid-cols-2 gap-5'>
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1.5">Widget Icon (Emoji)</label>
+                                        <input 
+                                            type="text" 
+                                            maxLength={2}
+                                            className='w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white text-center text-xl' 
+                                            placeholder='🤖' 
+                                            value={widgetIcon} 
+                                            onChange={(e) => setWidgetIcon(e.target.value)} 
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1.5">Welcome Message</label>
+                                        <input 
+                                            type="text" 
+                                            className='w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white' 
+                                            placeholder='Hi! How can I help you today?' 
+                                            value={welcomeMessage} 
+                                            onChange={(e) => setWelcomeMessage(e.target.value)} 
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
