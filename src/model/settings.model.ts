@@ -1,13 +1,14 @@
-import mongoose , { model, Schema } from "mongoose";
+import mongoose , { model, Schema, Document } from "mongoose";
 
-interface ISettings{
-    ownerId:string
-    businessName:string
-    supportEmail:string
-    knowledge:string
-    primaryColor?:string
-    widgetIcon?:string
-    welcomeMessage?:string
+interface ISettings extends Document {
+    ownerId: string
+    businessName: string
+    supportEmail: string
+    knowledge: string
+    primaryColor?: string
+    widgetIcon?: string
+    welcomeMessage?: string
+    allowedDomains?: string[]
 }
 
 const settingsSchema=new Schema<ISettings>({
@@ -37,7 +38,10 @@ const settingsSchema=new Schema<ISettings>({
     type:String,
     default:"Hi! How can I help you today?"
   },
-
+  allowedDomains: {
+    type: [String],
+    default: []
+  },
 
 },{timestamps:true})
 

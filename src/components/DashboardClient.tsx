@@ -21,6 +21,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const [primaryColor, setPrimaryColor] = useState("#000000")
     const [widgetIcon, setWidgetIcon] = useState("🤖")
     const [welcomeMessage, setWelcomeMessage] = useState("Hi! How can I help you today?")
+    const [allowedDomains, setAllowedDomains] = useState("")
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
     const [files, setFiles] = useState<File[]>([])
@@ -39,7 +40,11 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
     const handleSettings = async () => {
         setLoading(true)
         try {
-            await axios.post("/api/settings", { ownerId, businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage })
+            const domainsArray = allowedDomains.split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
+            await axios.post("/api/settings", { 
+                ownerId, businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage,
+                allowedDomains: domainsArray
+            })
             setLoading(false)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
@@ -60,6 +65,9 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                     setPrimaryColor(result.data.primaryColor || "#000000")
                     setWidgetIcon(result.data.widgetIcon || "🤖")
                     setWelcomeMessage(result.data.welcomeMessage || "Hi! How can I help you today?")
+                    if (result.data.allowedDomains) {
+                        setAllowedDomains(result.data.allowedDomains.join(", "))
+                    }
                 } catch (error) {
                     console.log(error)
                 }
@@ -207,6 +215,17 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                         value={supportEmail} 
                                         onChange={(e) => setSupportEmail(e.target.value)} 
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1.5">Allowed Domains (CORS Firewall)</label>
+                                    <input 
+                                        type="text" 
+                                        className='w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-zinc-50/50 focus:bg-white' 
+                                        placeholder='example.com, my-store.net (Leave empty to allow all)' 
+                                        value={allowedDomains} 
+                                        onChange={(e) => setAllowedDomains(e.target.value)} 
+                                    />
+                                    <p className="text-xs text-zinc-500 mt-2">Only these websites will be allowed to use your chatbot. Separate multiple domains with commas.</p>
                                 </div>
                             </div>
                         </div>

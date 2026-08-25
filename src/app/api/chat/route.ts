@@ -43,6 +43,20 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // Domain Whitelisting (CORS Firewall)
+        const requestOrigin = req.headers.get("origin") || req.headers.get("referer") || "";
+        let allowedOrigin = "*";
+        
+        if (setting.allowedDomains && setting.allowedDomains.length > 0) {
+            const isAllowed = setting.allowedDomains.some((domain: string) => requestOrigin.includes(domain));
+            if (!isAllowed) {
+                const res = NextResponse.json({ message: "Forbidden: Domain not whitelisted" }, { status: 403 });
+                res.headers.set("Access-Control-Allow-Origin", requestOrigin || "*");
+                return res;
+            }
+            allowedOrigin = requestOrigin;
+        }
+
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         // 1. Generate Embedding for user message
@@ -141,7 +155,7 @@ ANSWER
         })();
 
         const response = NextResponse.json(responseText)
-        response.headers.set("Access-Control-Allow-Origin", "*");
+        response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
         response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type");
         return response

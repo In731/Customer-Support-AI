@@ -12,11 +12,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
-        const { businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage } = await req.json()
+        const { businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage, allowedDomains } = await req.json()
         await connectDb()
         const settings = await Settings.findOneAndUpdate(
             { ownerId },
-            { ownerId, businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage },
+            { ownerId, businessName, supportEmail, knowledge, primaryColor, widgetIcon, welcomeMessage, allowedDomains },
             { new: true, upsert: true }
         )
         return NextResponse.json(settings)
