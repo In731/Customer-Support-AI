@@ -4,6 +4,15 @@ import mongoose from "mongoose";
 import pdfParse from "pdf-parse";
 import { GoogleGenAI } from "@google/genai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Rate Limiter: Allow 10 file uploads per minute per IP
+const ratelimit = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(10, "1 m"),
+    analytics: true,
+});
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -20,6 +29,13 @@ export async function POST(req: NextRequest) {
         const tenantId = (sessionData as any)?.user?.id;
         if (!tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Apply rate limiting
+        const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
+        const { success } = await ratelimit.limit(`upload_${ip}`);
+        if (!success) {
+            return NextResponse.json({ error: "Too many upload requests. Slow down." }, { status: 429 });
         }
 
         await connectDB();
@@ -46,6 +62,12 @@ export async function POST(req: NextRequest) {
         let extractedText = textSnippet || "";
         if (source.file) {
             const buffer = Buffer.from(await source.file.arrayBuffer());
+            
+            // Security Patch: Enforce 10MB file size limit on the backend (Memory DoS Protection)
+            if (buffer.byteLength > 10 * 1024 * 1024) {
+                return NextResponse.json({ error: "File too large. Maximum size is 10MB." }, { status: 413 });
+            }
+
             if (source.file.type === "application/pdf") {
                 extractedText = (await pdfParse(buffer)).text;
             } else if (source.file.type === "text/plain") {

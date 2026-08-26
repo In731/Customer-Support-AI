@@ -9,7 +9,7 @@ By simply uploading PDF documents or text snippets, businesses can generate an e
 ## 🚀 Key Features
 
 * **Multi-Tenant Architecture:** Securely isolates data, settings, and documents between different business tenants using `$vectorSearch` pre-filtering to guarantee data privacy.
-* **Retrieval-Augmented Generation (RAG):** Upload PDFs or text snippets to automatically train the chatbot. Text is intelligently chunked using **LangChain's RecursiveCharacterTextSplitter**, embedded using `gemini-embedding-001`, and searched via MongoDB Atlas Vector Search.
+* **Client-Side Batching Queue:** A custom React architecture that bypasses Vercel Serverless timeout limits by chunking large PDFs on the frontend and streaming them to the Gemini API sequentially, eliminating upload crashes.
 * **Zero-Overhead Analytics Engine:** Automatically tracks daily query volumes, deflection rates, and identifies "Knowledge Gaps" (questions the AI couldn't answer) using asynchronous TTL indexing—without adding latency to the chat responses.
 * **Embeddable Chat Widget:** A lightweight, highly-customizable chat widget (`chatBot.js`) featuring modern Shadcn-style UI that businesses can embed into their websites with a single `<script>` tag.
 * **Enterprise Authentication:** Seamless B2B login and session management powered by Scalekit (supporting SSO, SAML, etc.).
@@ -128,7 +128,8 @@ Navigate to `http://localhost:3000` to view the application.
 ## 📡 Core API Routes
 
 - `POST /api/chat`: The public-facing, CORS-protected endpoint that handles incoming messages from the embedded widget, performs RAG, and streams AI responses.
-- `POST /api/knowledge`: Ingests a new PDF, chunks it via LangChain, generates vector embeddings, and saves to MongoDB.
+- `POST /api/knowledge`: (Phase 1 Ingestion) Parses an uploaded PDF and runs LangChain to split it into an array of text chunks, returning them instantly to the browser.
+- `POST /api/knowledge/embed`: (Phase 2 Ingestion) Accepts a small batch of chunks from the browser's batching queue, calls Gemini to vectorize them, and uses `insertMany` to save them to MongoDB.
 - `GET /api/knowledge`: Retrieves a tenant's uploaded PDFs and document chunk processing stats.
 - `GET /api/analytics`: Fetches real-time chat volumes, deflection rates, and unanswered queries.
 - `POST /api/settings`: Updates tenant configurations, including the CORS Domain Whitelisting array.
@@ -163,7 +164,7 @@ graph TD
 ## 💡 How it works
 
 1. **Onboarding:** A business signs up via Scalekit and configures their chatbot's persona (Name, Support Email, and Allowed Domains).
-2. **Ingestion:** The business uploads knowledge (PDFs). The `/api/knowledge` endpoint parses the PDF, uses LangChain to generate intelligent overlapping chunks, and calls Gemini to generate vector embeddings. These are saved to MongoDB.
+2. **Ingestion (Batched):** The business uploads PDFs. The `/api/knowledge` endpoint parses the PDF and returns LangChain chunks. The React frontend orchestrates a Client-Side Queue, streaming batches of 5 chunks to `/api/knowledge/embed` while rendering a real-time progress bar. This guarantees 0% server timeouts.
 3. **Integration:** The business copies the provided `<script src=".../chatBot.js"></script>` and pastes it into their website's HTML.
 4. **Chatting:** When a customer asks a question, the widget sends a CORS-secured POST request to `/api/chat`. 
 5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces Domain Whitelisting, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and returns a highly contextual answer via `gemini-3.5-flash`.
