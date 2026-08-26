@@ -26,11 +26,7 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const textSnippet = formData.get("textSnippet") as string | null;
         const uploadedFiles = formData.getAll("files").filter((value): value is File => value instanceof File);
-        const legacyFile = formData.get("file");
-        if (uploadedFiles.length === 0 && legacyFile instanceof File) {
-            uploadedFiles.push(legacyFile);
-        }
-
+        
         if (uploadedFiles.length === 0 && !textSnippet) {
             return NextResponse.json({ error: "Please provide at least one PDF, TXT file, or text snippet." }, { status: 400 });
         }
@@ -38,76 +34,73 @@ export async function POST(req: NextRequest) {
         const sources = uploadedFiles.length > 0
             ? uploadedFiles.map((file) => ({ file, title: file.name, fileName: file.name }))
             : [{ file: null, title: "Text Snippet", fileName: undefined }];
-        const documents = [];
 
-        // Configure LangChain Splitter
+        // We only support single file/snippet upload per request in the new batched architecture
+        const source = sources[0]; 
+        
         const splitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
             chunkOverlap: 200,
         });
 
-        for (const source of sources) {
-            let documentRecord;
-            try {
-                let extractedText = textSnippet || "";
-                if (source.file) {
-                    const buffer = Buffer.from(await source.file.arrayBuffer());
-                    if (source.file.type === "application/pdf") {
-                        extractedText = (await pdfParse(buffer)).text;
-                    } else if (source.file.type === "text/plain") {
-                        extractedText = buffer.toString("utf-8");
-                    } else {
-                        throw new Error(`${source.file.name}: only PDF and TXT files are supported.`);
-                    }
-                }
-
-                if (!extractedText.trim()) {
-                    throw new Error(`${source.title}: no text found to process.`);
-                }
-
-                documentRecord = await KnowledgeDocument.create({
-                    tenantId,
-                    title: source.title,
-                    fileName: source.fileName,
-                    status: "processing"
-                });
-
-                // Generate highly contextual chunks using LangChain
-                const chunks = await splitter.splitText(extractedText);
-                
-                for (const chunk of chunks) {
-                    if (!chunk.trim()) continue;
-                    const response = await ai.models.embedContent({
-                        model: "gemini-embedding-001",
-                        contents: chunk,
-                    });
-                    const embedding = response.embeddings?.[0]?.values?.slice(0, 768);
-                    if (embedding) {
-                        await KnowledgeChunk.create({
-                            documentId: documentRecord._id,
-                            tenantId,
-                            text: chunk,
-                            embedding
-                        });
-                    }
-                }
-
-                documentRecord.status = "embedded";
-                await documentRecord.save();
-                documents.push({ id: documentRecord._id, title: documentRecord.title, status: documentRecord.status });
-            } catch (error: any) {
-                if (documentRecord) {
-                    documentRecord.status = "failed";
-                    await documentRecord.save();
-                }
-                return NextResponse.json({ error: error.message || "Failed to ingest knowledge" }, { status: 400 });
+        let extractedText = textSnippet || "";
+        if (source.file) {
+            const buffer = Buffer.from(await source.file.arrayBuffer());
+            if (source.file.type === "application/pdf") {
+                extractedText = (await pdfParse(buffer)).text;
+            } else if (source.file.type === "text/plain") {
+                extractedText = buffer.toString("utf-8");
+            } else {
+                return NextResponse.json({ error: `${source.file.name}: only PDF and TXT files are supported.` }, { status: 400 });
             }
         }
 
-        return NextResponse.json({ success: true, message: `${documents.length} document(s) uploaded and processed successfully.`, documents });
+        if (!extractedText.trim()) {
+            return NextResponse.json({ error: `${source.title}: no text found to process.` }, { status: 400 });
+        }
+
+        // Phase 1: Create the Document record with 'processing' status
+        const documentRecord = await KnowledgeDocument.create({
+            tenantId,
+            title: source.title,
+            fileName: source.fileName,
+            status: "processing"
+        });
+
+        // Phase 2: Split text and return chunks to the client for batching
+        const rawChunks = await splitter.splitText(extractedText);
+        const validChunks = rawChunks.filter(chunk => chunk.trim().length > 0);
+
+        return NextResponse.json({ 
+            success: true, 
+            message: "File parsed successfully.", 
+            documentId: documentRecord._id,
+            chunks: validChunks
+        });
+
     } catch (error: any) {
         console.error("Ingestion error:", error);
         return NextResponse.json({ error: error.message || "Failed to ingest knowledge" }, { status: 500 });
+    }
+}
+
+// Helper route to finalize document status
+export async function PUT(req: NextRequest) {
+    try {
+        const sessionData = await getSession();
+        const tenantId = (sessionData as any)?.user?.id;
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        await connectDB();
+        const { documentId, status } = await req.json();
+        
+        await KnowledgeDocument.findOneAndUpdate(
+            { _id: documentId, tenantId },
+            { status }
+        );
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 

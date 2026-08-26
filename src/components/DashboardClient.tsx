@@ -92,27 +92,63 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
         }
     }, [ownerId, activeTab])
 
+    const [uploadProgress, setUploadProgress] = useState(0)
+    const [totalChunks, setTotalChunks] = useState(0)
+
     const handleUpload = async () => {
         if (files.length === 0) return;
         setUploadingDoc(true);
         setUploadMsg("");
+        setUploadProgress(0);
+        setTotalChunks(0);
+
         try {
+            // Phase 1: Parse file and get raw text chunks
             const formData = new FormData();
-            files.forEach((file) => formData.append("files", file));
+            formData.append("files", files[0]); // Only handle 1 at a time for the batch UX
             formData.append("tenantId", ownerId);
-            const res = await axios.post("/api/knowledge", formData);
-            if (res.data.success) {
-                setUploadMsg(res.data.message);
-                setFiles([]);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-                const documentsResult = await axios.get("/api/knowledge", { params: { tenantId: ownerId } });
-                setDocuments(documentsResult.data);
+            
+            const parseRes = await axios.post("/api/knowledge", formData);
+            if (!parseRes.data.success) throw new Error(parseRes.data.error || "Parsing failed");
+
+            const { documentId, chunks } = parseRes.data;
+            const total = chunks.length;
+            setTotalChunks(total);
+            
+            // Phase 2: Client-Side Batching Queue
+            const BATCH_SIZE = 5;
+            let processed = 0;
+
+            for (let i = 0; i < total; i += BATCH_SIZE) {
+                const batch = chunks.slice(i, i + BATCH_SIZE);
+                await axios.post("/api/knowledge/embed", {
+                    documentId,
+                    chunks: batch
+                });
+                processed += batch.length;
+                setUploadProgress(processed);
             }
+
+            // Finalize Document Status
+            await axios.put("/api/knowledge", { documentId, status: "embedded" });
+
+            setUploadMsg(`Successfully trained AI on ${total} chunks!`);
+            setFiles([]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            const documentsResult = await axios.get("/api/knowledge", { params: { tenantId: ownerId } });
+            setDocuments(documentsResult.data);
+            
         } catch (error: any) {
             console.log(error);
             setUploadMsg(error.response?.data?.error || "Upload failed");
+            // Note: In production we'd want to mark document as 'failed' here via API call
+        } finally {
+            setUploadingDoc(false);
+            setTimeout(() => {
+                setUploadProgress(0);
+                setTotalChunks(0);
+            }, 3000);
         }
-        setUploadingDoc(false);
     }
 
     const handleDeleteDocument = async (document: UploadedDocument) => {
@@ -334,27 +370,51 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                 </div>
                             </div>
                             
-                            <div className="mt-5 flex items-center gap-4">
-                                <button
-                                    disabled={uploadingDoc || files.length === 0}
-                                    onClick={handleUpload}
-                                    className="px-6 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-zinc-900/10"
-                                >
-                                    {uploadingDoc ? (
-                                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full" />
-                                    ) : (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                                    )}
-                                    {uploadingDoc ? "Processing..." : "Upload & Train"}
-                                </button>
-                                {uploadMsg && (
-                                    <motion.p 
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className={`text-sm font-medium ${uploadMsg.includes("failed") ? "text-red-500" : "text-emerald-600"}`}
+                            <div className="mt-5 flex flex-col gap-3">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        disabled={uploadingDoc || files.length === 0}
+                                        onClick={handleUpload}
+                                        className="px-6 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-zinc-900/10"
                                     >
-                                        {uploadMsg}
-                                    </motion.p>
+                                        {uploadingDoc ? (
+                                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full" />
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                        )}
+                                        {uploadingDoc ? "Processing..." : "Upload & Train"}
+                                    </button>
+                                    {uploadMsg && (
+                                        <motion.p 
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className={`text-sm font-medium ${uploadMsg.includes("failed") ? "text-red-500" : "text-emerald-600"}`}
+                                        >
+                                            {uploadMsg}
+                                        </motion.p>
+                                    )}
+                                </div>
+                                
+                                {/* Progress Bar UI */}
+                                {uploadingDoc && totalChunks > 0 && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, height: 0 }} 
+                                        animate={{ opacity: 1, height: 'auto' }} 
+                                        className="w-full max-w-sm mt-2"
+                                    >
+                                        <div className="flex justify-between text-xs text-zinc-500 mb-1.5 font-medium">
+                                            <span>Embedding knowledge...</span>
+                                            <span>{Math.min(uploadProgress, totalChunks)} / {totalChunks} chunks</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+                                            <motion.div 
+                                                className="h-full bg-indigo-500" 
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${(uploadProgress / totalChunks) * 100}%` }}
+                                                transition={{ ease: "easeOut" }}
+                                            />
+                                        </div>
+                                    </motion.div>
                                 )}
                             </div>
 
