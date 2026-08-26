@@ -3,10 +3,10 @@
     // Uncomment the one you are currently using:
 
     // 1. Local Development
-     const baseUrl = "http://localhost:3000";
+     //const baseUrl = "http://localhost:3000";
     
     // 2. Production (Vercel)
-   // const baseUrl = "https://customer-support-ai-blush-two.vercel.app";
+     const baseUrl = "https://customer-support-ai-blush-two.vercel.app";
 
     const api_Url = `${baseUrl}/api/chat`;
     const scriptTag = document.currentScript;
