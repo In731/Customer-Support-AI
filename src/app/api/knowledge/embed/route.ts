@@ -15,10 +15,7 @@ const ratelimit = new Ratelimit({
     analytics: true,
 });
 
-async function connectDB() {
-    if (mongoose.connection.readyState >= 1) return;
-    await mongoose.connect(process.env.MONGODB_URL as string, { family: 4 });
-}
+import connectDb from "@/lib/db";
 
 export async function POST(req: NextRequest) {
     try {
@@ -35,7 +32,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Too many batch requests. Slow down." }, { status: 429 });
         }
 
-        await connectDB();
+        await connectDb();
         const { documentId, chunks } = await req.json();
 
         if (!documentId || !chunks || !Array.isArray(chunks)) {

@@ -16,11 +16,7 @@ const ratelimit = new Ratelimit({
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-async function connectDB() {
-    if (mongoose.connection.readyState >= 1) return;
-    await mongoose.connect(process.env.MONGODB_URL as string, { family: 4 });
-}
-
+import connectDb from "@/lib/db";
 import { getSession } from "@/lib/getSession";
 
 export async function POST(req: NextRequest) {
@@ -38,7 +34,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Too many upload requests. Slow down." }, { status: 429 });
         }
 
-        await connectDB();
+        await connectDb();
         const formData = await req.formData();
         const textSnippet = formData.get("textSnippet") as string | null;
         const uploadedFiles = formData.getAll("files").filter((value): value is File => value instanceof File);
@@ -113,7 +109,7 @@ export async function PUT(req: NextRequest) {
         const tenantId = (sessionData as any)?.user?.id;
         if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        await connectDB();
+        await connectDb();
         const { documentId, status } = await req.json();
         
         await KnowledgeDocument.findOneAndUpdate(
@@ -134,7 +130,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        await connectDB();
+        await connectDb();
         const documents = await KnowledgeDocument.aggregate([
             { $match: { tenantId } },
             {
@@ -179,7 +175,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: "documentId is required" }, { status: 400 });
         }
 
-        await connectDB();
+        await connectDb();
         const document = await KnowledgeDocument.findOne({ _id: documentId, tenantId });
         if (!document) {
             return NextResponse.json({ error: "Document not found" }, { status: 404 });
