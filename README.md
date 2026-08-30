@@ -17,9 +17,10 @@ By uploading PDF manuals or text snippets, businesses generate an embeddable cha
 
 ## 🚀 Key Features
 
-* **Multi-Tenant Architecture:** Securely isolates data, settings, and vector chunks across business tenants using `$vectorSearch` pre-filtering to guarantee complete data privacy.
-* **Client-Side Batching Queue:** A custom React architecture that bypasses Serverless execution limits (Vercel/AWS) by chunking large PDFs on the frontend and streaming them to the Gemini API in batches, reducing server timeouts by 100%.
-* **Retrieval-Augmented Generation (RAG):** Context is intelligently split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001` (768 dimensions), and queried with cosine similarity via MongoDB Atlas Vector Search.
+* **Multi-Tenant Architecture:** Securely isolates data, settings, and vector chunks across business tenants using `$vectorSearch` pre-filtering to guarantee tenant data separation.
+* **Client-Side Batching Queue:** A custom React ingestion architecture designed to eliminate serverless execution timeouts on large multi-page PDFs by chunking on the client and streaming sequential 5-chunk batches to the embedding API.
+* **Real-Time Token Streaming:** Delivers sub-300ms Time-to-First-Token (TTFT) by streaming responses from Gemini's `generateContentStream` through a standard Web `ReadableStream` directly into the embed widget.
+* **Retrieval-Augmented Generation (RAG):** Context is split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001` (768 dimensions), and queried with cosine similarity via MongoDB Atlas Vector Search.
 * **Zero-Overhead Analytics Engine:** Tracks daily query volumes, deflection rates, and detects "Knowledge Gaps" (unanswered questions) using asynchronous TTL indexing without blocking user chat responses.
 * **Embeddable Chat Widget:** A lightweight, dependency-free chat widget (`chatBot.js`) featuring modern Shadcn-style UI that embeds into any website with a single `<script>` tag.
 * **Enterprise Authentication:** Seamless B2B login and session management powered by Scalekit (supporting SSO, SAML, and OAuth).
@@ -35,6 +36,7 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 3. **Multi-Layered Edge Rate Limiting:** Public chat (`/api/chat`) and ingestion (`/api/knowledge`) routes are shielded by Upstash Serverless Redis Sliding Window rate limiters to eliminate DDoS and brute-force attacks.
 4. **Memory DoS & Payload Bounds:** Strict backend limits (10MB buffer maximum, 20 chunks per batch) reject oversized payloads before they reach Node.js memory buffers.
 5. **XSS Sanitization:** The embed widget uses `textContent` DOM insertion instead of `innerHTML`, blocking stored and reflected Cross-Site Scripting.
+6. **Error Sanitization (CWE-209 Patch):** Internal database drivers and stack traces are suppressed from client responses and logged exclusively on the server console.
 
 ---
 
@@ -43,19 +45,19 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 ### Frontend & Widget
 - **Framework:** Next.js (App Router) & React
 - **Styling & Motion:** TailwindCSS & Framer Motion (for real-time upload progress and micro-interactions)
-- **Embed Widget:** Vanilla JS (`chatBot.js`) with zero external runtime dependencies
+- **Embed Widget:** Vanilla JS (`chatBot.js`) with streaming `ReadableStreamDefaultReader` and zero external dependencies
 
 ### Backend & Infrastructure
-- **API Engine:** Next.js Serverless API Routes
+- **API Engine:** Next.js Serverless API Routes (with UTF-8 `ReadableStream` response streaming)
 - **Database:** MongoDB & Mongoose (with connection pooling error-recovery in `db.ts`)
-- **Vector Search:** MongoDB Atlas Vector Search (Cosine Similarity, 768 dimensions)
+- **Vector Search:** MongoDB Atlas Vector Search (Cosine Similarity, 768 dimensions with pre-filtered `tenantId`)
 - **Authentication:** Scalekit SDK (B2B Multi-Tenant OAuth)
 - **Rate Limiting:** Upstash Serverless Redis (`@upstash/ratelimit`)
 
 ### AI & Testing
-- **LLM Engine:** Google Gemini (`gemini-3.5-flash` for generation, `gemini-embedding-001` for vectors)
+- **LLM Engine:** Google Gemini (`gemini-3.5-flash` with `generateContentStream` for generation, `gemini-embedding-001` for vectors)
 - **NLP Processing:** LangChain (`RecursiveCharacterTextSplitter`) & `pdf-parse`
-- **Testing & CI:** Vitest (Automated unit testing) & GitHub Actions (CI on push/PR)
+- **Testing & CI:** Vitest (Automated unit testing) & GitHub Actions (CI on push/PR with Node 22)
 
 ---
 
@@ -82,7 +84,7 @@ npm run lint
 ### 1. Clone the repository
 ```bash
 git clone https://github.com/your-username/support-ai.git
-cd support-ai/support-ai
+cd support-ai
 ```
 
 ### 2. Install Dependencies
@@ -113,12 +115,27 @@ UPSTASH_REDIS_REST_TOKEN="your_upstash_redis_token"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-### 4. Database Setup
-Configure a **Vector Search Index** in your MongoDB Atlas cluster on the `knowledgechunks` collection:
-- **Index Name:** `vector_index`
-- **Dimensions:** 768
-- **Similarity:** cosine
-- **Path:** embedding
+### 4. Database & Atlas Vector Index Setup
+In your MongoDB Atlas cluster, navigate to **Atlas Search** > **Create Search Index** > **JSON Editor**, select the `knowledgechunks` collection, name the index `vector_index`, and use the following JSON definition:
+
+> **Important:** The `tenantId` field **must** be defined with `type: "filter"` to enable tenant-isolated `$vectorSearch` queries.
+
+```json
+{
+  "fields": [
+    {
+      "type": "vector",
+      "path": "embedding",
+      "numDimensions": 768,
+      "similarity": "cosine"
+    },
+    {
+      "type": "filter",
+      "path": "tenantId"
+    }
+  ]
+}
+```
 
 ### 5. Start the Development Server
 ```bash
@@ -134,7 +151,7 @@ Navigate to `http://localhost:3000` to access the application.
 ├── .github/workflows/
 │   └── ci.yml             # Automated CI pipeline (lint + unit tests on Node 22)
 ├── public/
-│   └── chatBot.js         # Lightweight, cross-origin embeddable chat widget
+│   └── chatBot.js         # Real-time streaming embeddable chat widget
 ├── src/
 │   ├── app/
 │   │   ├── api/           # Serverless API Routes (chat, knowledge, settings, analytics, auth)
@@ -152,7 +169,7 @@ Navigate to `http://localhost:3000` to access the application.
 
 ## 📡 Core API Routes
 
-- `POST /api/chat`: Public-facing, CORS-protected endpoint that handles incoming widget messages, executes RAG, and streams AI responses.
+- `POST /api/chat`: Public-facing, CORS-protected endpoint that executes multi-tenant RAG and streams real-time AI responses via a Web `ReadableStream`.
 - `POST /api/knowledge`: (Phase 1 Ingestion) Parses uploaded PDFs/TXT and runs LangChain to return structured text chunks to the browser.
 - `POST /api/knowledge/embed`: (Phase 2 Ingestion) Receives chunk batches from the browser queue, calls Gemini Embeddings, and bulk-inserts vectors into MongoDB.
 - `GET /api/knowledge`: Retrieves a tenant's uploaded documents and chunk processing stats.
@@ -176,15 +193,15 @@ graph TD
     API -->|4. Embed Query| Gemini1[Google Gemini API]
     
     Gemini1 -->|Returns Vector| API
-    API -->|5. $vectorSearch with tenantId| Atlas[(Atlas Vector Database)]
+    API -->|5. $vectorSearch with tenantId filter| Atlas[(Atlas Vector Database)]
     
     Atlas -->|Returns Context| API
     API -->|6. Prompt Generation| Gemini2[Google Gemini API]
     
-    Gemini2 -->|Streams Answer| API
+    Gemini2 -->|Streams Tokens via ReadableStream| API
     API -->|7. Async Telemetry| DB2[(MongoDB Analytics)]
     
-    API -->|Sends Response| Widget
+    API -->|Streams Response| Widget
 ```
 
 ---
@@ -192,11 +209,11 @@ graph TD
 ## 💡 How It Works
 
 1. **Onboarding:** A business signs up via Scalekit and configures their chatbot's persona (Name, Support Email, and Allowed Domains).
-2. **Ingestion (Batched):** The business uploads PDFs. The `/api/knowledge` endpoint parses the PDF and returns LangChain chunks. The React frontend orchestrates a Client-Side Queue, streaming batches of 5 chunks to `/api/knowledge/embed` while rendering a real-time progress bar. This guarantees 0% server timeouts.
+2. **Ingestion (Batched):** The business uploads PDFs. The `/api/knowledge` endpoint parses the PDF and returns LangChain chunks. The React frontend orchestrates a Client-Side Queue, streaming batches of 5 chunks to `/api/knowledge/embed` while rendering a real-time progress bar to avoid serverless function execution timeouts.
 3. **Integration:** The business copies the provided `<script src=".../chatBot.js" data-owner-id="..."></script>` and pastes it into their website's HTML.
 4. **Chatting:** When a customer asks a question, the widget sends a CORS-secured POST request to `/api/chat`. 
-5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces RFC 3986 Hostname validation, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and returns a contextual answer via `gemini-3.5-flash`.
-6. **Analytics:** The outcome of the conversation is asynchronously logged to MongoDB TTL Analytics collections without blocking the user's response.
+5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces RFC 3986 Hostname validation, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and streams real-time tokens using `gemini-3.5-flash` via a Web `ReadableStream`.
+6. **Analytics:** The outcome of the conversation is asynchronously logged to MongoDB TTL Analytics collections without blocking the streamed response.
 
 ---
 
