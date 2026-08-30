@@ -1,20 +1,22 @@
 (async function () {
-    // --- API URLs ---
-    // Uncomment the one you are currently using:
-
-    // 1. Local Development
-     //const baseUrl = "http://localhost:3000";
+    const scriptTag = document.currentScript || document.querySelector('script[data-owner-id]');
     
-    // 2. Production (Vercel)
-     const baseUrl = "https://customer-support-ai-blush-two.vercel.app";
+    // Automatically detect baseUrl from wherever chatBot.js was loaded
+    let baseUrl = "https://customer-support-ai-blush-two.vercel.app";
+    try {
+        if (scriptTag && scriptTag.src) {
+            baseUrl = new URL(scriptTag.src).origin;
+        }
+    } catch {
+        // Fallback to default
+    }
 
     const api_Url = `${baseUrl}/api/chat`;
-    const scriptTag = document.currentScript;
-    const ownerId = scriptTag.getAttribute("data-owner-id")
+    const ownerId = scriptTag ? scriptTag.getAttribute("data-owner-id") : null;
 
     if (!ownerId) {
-        console.log("owner id not found")
-        return
+        console.warn("NexSupport AI: data-owner-id attribute not found on script tag");
+        return;
     }
 
     const public_api_url = `${baseUrl}/api/settings/public?ownerId=` + ownerId;

@@ -10,44 +10,48 @@ import { isOriginAllowed } from "@/lib/cors";
 
 const ratelimit = new Ratelimit({
     redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(15, "1 m"), // 15 requests per minute per IP to match Gemini Free Tier
+    limiter: Ratelimit.slidingWindow(15, "1 m"), // 15 requests per minute per IP
     analytics: true,
 });
 
 export async function POST(req: NextRequest) {
+    const requestOrigin = req.headers.get("origin") || req.headers.get("referer") || "*";
+    
     try {
-        const { message, ownerId } = await req.json()
+        const { message, ownerId } = await req.json();
         if (!message || !ownerId) {
-            return NextResponse.json(
+            const res = NextResponse.json(
                 { message: "message and owner id is required" },
                 { status: 400 }
-            )
+            );
+            res.headers.set("Access-Control-Allow-Origin", "*");
+            return res;
         }
 
         // Apply rate limiting
         const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
         const { success } = await ratelimit.limit(ip);
         if (!success) {
-            const res = NextResponse.json({ message: "Too many requests" }, { status: 429 });
+            const res = NextResponse.json({ message: "Too many requests. Please slow down." }, { status: 429 });
             res.headers.set("Access-Control-Allow-Origin", "*");
             res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
             res.headers.set("Access-Control-Allow-Headers", "Content-Type");
             return res;
         }
 
-        await connectDb()
-        const setting = await Settings.findOne({ ownerId })
+        await connectDb();
+        const setting = await Settings.findOne({ ownerId });
         if (!setting) {
-            return NextResponse.json(
-                { message: "chat bot is not configured yet." },
+            const res = NextResponse.json(
+                { message: "Chatbot is not configured yet. Please configure your settings in the dashboard." },
                 { status: 400 }
-            )
+            );
+            res.headers.set("Access-Control-Allow-Origin", "*");
+            return res;
         }
 
         // Domain Whitelisting (CORS Firewall)
-        const requestOrigin = req.headers.get("origin") || req.headers.get("referer") || "";
         let allowedOrigin = "*";
-        
         if (setting.allowedDomains && setting.allowedDomains.length > 0) {
             const isAllowed = isOriginAllowed(requestOrigin, setting.allowedDomains);
             if (!isAllowed) {
@@ -60,35 +64,38 @@ export async function POST(req: NextRequest) {
 
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-        // 1. Generate Embedding for user message
-        const embeddingResponse = await ai.models.embedContent({
-            model: 'gemini-embedding-001',
-            contents: message,
-        });
-        const queryEmbedding = embeddingResponse.embeddings?.[0]?.values?.slice(0, 768);
-
+        // 1. Generate Embedding for user message & perform Vector Search (with graceful fallback)
         let additionalKnowledge = "";
-        if (queryEmbedding) {
-            // 2. Perform Vector Search in MongoDB
-            const similarChunks = await KnowledgeChunk.aggregate([
-                {
-                    $vectorSearch: {
-                        index: "vector_index", // Name of the index in Atlas
-                        path: "embedding",
-                        queryVector: queryEmbedding,
-                        numCandidates: 100,
-                        limit: 3,
-                        filter: { tenantId: ownerId } 
+        try {
+            const embeddingResponse = await ai.models.embedContent({
+                model: 'gemini-embedding-001',
+                contents: message,
+            });
+            const queryEmbedding = embeddingResponse.embeddings?.[0]?.values?.slice(0, 768);
+
+            if (queryEmbedding) {
+                const similarChunks = await KnowledgeChunk.aggregate([
+                    {
+                        $vectorSearch: {
+                            index: "vector_index",
+                            path: "embedding",
+                            queryVector: queryEmbedding,
+                            numCandidates: 100,
+                            limit: 3,
+                            filter: { tenantId: ownerId } 
+                        }
+                    },
+                    {
+                        $project: {
+                            text: 1,
+                            score: { $meta: "vectorSearchScore" }
+                        }
                     }
-                },
-                {
-                    $project: {
-                        text: 1,
-                        score: { $meta: "vectorSearchScore" }
-                    }
-                }
-            ]);
-            additionalKnowledge = similarChunks.map(c => c.text).join("\n\n");
+                ]);
+                additionalKnowledge = similarChunks.map(c => c.text).join("\n\n");
+            }
+        } catch (vectorErr) {
+            console.warn("Vector search failed or index building, proceeding with base knowledge:", vectorErr);
         }
 
         const KNOWLEDGE = `
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest) {
         
         Additional specific documentation context:
         ${additionalKnowledge}
-        `
+        `;
 
         const prompt = `
 You are a professional customer support assistant for this business.
@@ -196,12 +203,12 @@ ANSWER
 }
 
 export const OPTIONS = async () => {
-    return NextResponse.json(null, {
-        status: 201,
+    return new Response(null, {
+        status: 200,
         headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
         }
-    })
-}
+    });
+};
