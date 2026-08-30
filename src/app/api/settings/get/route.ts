@@ -13,9 +13,10 @@ export async function POST() {
         await connectDb();
         const setting = await Settings.findOne({ ownerId });
         return NextResponse.json(setting);
-    } catch (error) {
+    } catch (error: unknown) {
+        console.error("Settings fetch error:", error);
         return NextResponse.json(
-            { message: `get setting error ${error}` },
+            { message: "Failed to fetch settings" },
             { status: 500 }
         );
     }

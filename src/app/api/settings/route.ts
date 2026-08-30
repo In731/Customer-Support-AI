@@ -20,11 +20,13 @@ export async function POST(req: NextRequest) {
             { new: true, upsert: true }
         )
         return NextResponse.json(settings)
-    } catch (error) {
+    } catch (error: unknown) {
+        console.error("Settings update error:", error);
+        const errorMessage = error instanceof Error ? error.message : "Failed to update settings";
         return NextResponse.json(
-            { message: `settings error ${error}` },
+            { message: errorMessage },
             { status: 500 }
-        )
+        );
     }
 }
 

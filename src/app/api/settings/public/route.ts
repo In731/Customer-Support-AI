@@ -39,11 +39,12 @@ export async function GET(req: NextRequest) {
         response.headers.set("Access-Control-Allow-Headers", "Content-Type");
         
         return response
-    } catch (error) {
+    } catch (error: unknown) {
+        console.error("Public settings error:", error);
         return NextResponse.json(
-            { message: `settings error ${error}` },
+            { message: "Failed to load widget settings" },
             { status: 500 }
-        )
+        );
     }
 }
 

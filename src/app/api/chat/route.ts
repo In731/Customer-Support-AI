@@ -161,16 +161,16 @@ ANSWER
         response.headers.set("Access-Control-Allow-Headers", "Content-Type");
         return response
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("CHAT API ERROR:", error);
         const response = NextResponse.json(
-            { message: `chat error ${error}` },
+            { message: "Failed to process message. Please try again later." },
             { status: 500 }
-        )
+        );
         response.headers.set("Access-Control-Allow-Origin", "*");
         response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type");
-        return response
+        return response;
     }
 }
 
