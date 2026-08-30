@@ -22,7 +22,7 @@ import { getSession } from "@/lib/getSession";
 export async function POST(req: NextRequest) {
     try {
         const sessionData = await getSession();
-        const tenantId = (sessionData as any)?.user?.id;
+        const tenantId = sessionData?.user?.id;
         if (!tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const sessionData = await getSession();
-        const tenantId = (sessionData as any)?.user?.id;
+        const tenantId = sessionData?.user?.id;
         if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         await connectDb();
@@ -125,7 +125,7 @@ export async function PUT(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         const sessionData = await getSession();
-        const tenantId = (sessionData as any)?.user?.id;
+        const tenantId = sessionData?.user?.id;
         if (!tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const sessionData = await getSession();
-        const tenantId = (sessionData as any)?.user?.id;
+        const tenantId = sessionData?.user?.id;
         if (!tenantId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }

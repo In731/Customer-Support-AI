@@ -31,16 +31,20 @@ describe('Domain Whitelisting (CORS Firewall)', () => {
         expect(isAllowed).toBe(false);
     });
 
+    it('rejects a domain that merely contains the allowed domain as a substring', () => {
+        expect(isOriginAllowed("https://evil-acme.com.attacker.net", ["acme.com"])).toBe(false);
+    });
+
     it('should BLOCK substring and suffix injection attacks', () => {
-        const allowedDomains = ["acme.com"];
+        const allowed = ["acme.com"];
         
         // Suffix / Sibling domain injection
-        expect(isOriginAllowed("https://evil-acme.com", allowedDomains)).toBe(false);
-        expect(isOriginAllowed("https://acme.com.attacker.net", allowedDomains)).toBe(false);
-        expect(isOriginAllowed("https://notacme.com", allowedDomains)).toBe(false);
+        expect(isOriginAllowed("https://evil-acme.com", allowed)).toBe(false);
+        expect(isOriginAllowed("https://acme.com.attacker.net", allowed)).toBe(false);
+        expect(isOriginAllowed("https://notacme.com", allowed)).toBe(false);
 
         // Path & Query parameter smuggling in Referer headers
-        expect(isOriginAllowed("https://attacker.net?ref=acme.com", allowedDomains)).toBe(false);
-        expect(isOriginAllowed("https://attacker.net/acme.com", allowedDomains)).toBe(false);
+        expect(isOriginAllowed("https://attacker.net?ref=acme.com", allowed)).toBe(false);
+        expect(isOriginAllowed("https://attacker.net/acme.com", allowed)).toBe(false);
     });
 });

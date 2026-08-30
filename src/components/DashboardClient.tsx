@@ -2,7 +2,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from 'next/navigation'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
+import { IDailyMetric, IUnanswered } from '@/types'
 
 type UploadedDocument = {
     _id: string
@@ -33,8 +34,8 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
 
     // Analytics State
     const [activeTab, setActiveTab] = useState<"settings" | "insights">("settings")
-    const [metrics, setMetrics] = useState<any[]>([])
-    const [unanswered, setUnanswered] = useState<any[]>([])
+    const [metrics, setMetrics] = useState<IDailyMetric[]>([])
+    const [unanswered, setUnanswered] = useState<IUnanswered[]>([])
     const [loadingAnalytics, setLoadingAnalytics] = useState(false)
 
     const handleSettings = async () => {
@@ -138,10 +139,10 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
             const documentsResult = await axios.get("/api/knowledge", { params: { tenantId: ownerId } });
             setDocuments(documentsResult.data);
             
-        } catch (error: any) {
-            console.log(error);
-            setUploadMsg(error.response?.data?.error || "Upload failed");
-            // Note: In production we'd want to mark document as 'failed' here via API call
+        } catch (error: unknown) {
+            console.error(error);
+            const msg = isAxiosError(error) ? error.response?.data?.error : "Upload failed";
+            setUploadMsg(msg || "Upload failed");
         } finally {
             setUploadingDoc(false);
             setTimeout(() => {
@@ -161,9 +162,10 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
             await axios.delete("/api/knowledge", { data: { documentId: document._id, tenantId: ownerId } });
             setDocuments((current) => current.filter((item) => item._id !== document._id));
             setUploadMsg(`${fileName} was removed from the knowledge base.`);
-        } catch (error: any) {
-            console.log(error);
-            setUploadMsg(error.response?.data?.error || "Unable to remove document");
+        } catch (error: unknown) {
+            console.error(error);
+            const msg = isAxiosError(error) ? error.response?.data?.error : "Unable to remove document";
+            setUploadMsg(msg || "Unable to remove document");
         } finally {
             setDeletingDocumentId(null);
         }
@@ -500,7 +502,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                     <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     Knowledge Gaps
                                 </h2>
-                                <p className='text-sm text-zinc-500 mb-6'>These are questions your customers asked recently that the bot couldn't answer. Add information covering these topics to your Knowledge Base.</p>
+                                <p className='text-sm text-zinc-500 mb-6'>These are questions your customers asked recently that the bot couldn&apos;t answer. Add information covering these topics to your Knowledge Base.</p>
                                 
                                 {loadingAnalytics ? (
                                     <div className="flex justify-center p-8">
@@ -516,7 +518,7 @@ function DashboardClient({ ownerId }: { ownerId: string }) {
                                     <div className="space-y-3">
                                         {unanswered.map((u, i) => (
                                             <div key={i} className="p-4 rounded-xl border border-zinc-100 bg-zinc-50/50 flex justify-between items-center hover:bg-zinc-50 transition-colors">
-                                                <span className="font-medium text-zinc-800 text-sm">"{u.question}"</span>
+                                                <span className="font-medium text-zinc-800 text-sm">&ldquo;{u.question}&rdquo;</span>
                                                 <span className="text-xs font-medium text-zinc-400 bg-white px-2 py-1 rounded-md border border-zinc-100">{new Date(u.createdAt).toLocaleDateString()}</span>
                                             </div>
                                         ))}

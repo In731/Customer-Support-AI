@@ -7,7 +7,7 @@ import { getSession } from "@/lib/getSession";
 export async function POST(req: NextRequest) {
     try {
         const sessionData = await getSession();
-        const ownerId = (sessionData as any)?.user?.id;
+        const ownerId = sessionData?.user?.id;
         if (!ownerId) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
