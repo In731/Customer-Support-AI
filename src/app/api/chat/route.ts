@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { isOriginAllowed } from "@/lib/cors";
 
 const ratelimit = new Ratelimit({
     redis: Redis.fromEnv(),
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
         let allowedOrigin = "*";
         
         if (setting.allowedDomains && setting.allowedDomains.length > 0) {
-            const isAllowed = setting.allowedDomains.some((domain: string) => requestOrigin.includes(domain));
+            const isAllowed = isOriginAllowed(requestOrigin, setting.allowedDomains);
             if (!isAllowed) {
                 const res = NextResponse.json({ message: "Forbidden: Domain not whitelisted" }, { status: 403 });
                 res.headers.set("Access-Control-Allow-Origin", requestOrigin || "*");
