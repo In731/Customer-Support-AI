@@ -123,43 +123,64 @@ ANSWER
 --------------------
 `;
 
-        const res = await ai.models.generateContent({
+        const responseStream = await ai.models.generateContentStream({
             model: "gemini-3.5-flash",
             contents: prompt,
         });
 
-        const responseText = res.text || "I'm sorry, I don't have that information in my knowledge base.";
-        const isEscalated = responseText.includes("I'm sorry, I don't have that information in my knowledge base.");
-        const dateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+        let fullResponseText = "";
+        const encoder = new TextEncoder();
 
-        // Asynchronously log analytics so we don't block the response
-        (async () => {
-            try {
-                await DailyAnalytics.findOneAndUpdate(
-                    { ownerId, date: dateStr },
-                    { 
-                        $inc: { 
-                            totalQueries: 1, 
-                            deflectedQueries: isEscalated ? 0 : 1,
-                            escalatedQueries: isEscalated ? 1 : 0
-                        } 
-                    },
-                    { upsert: true }
-                );
+        const customReadableStream = new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const chunk of responseStream) {
+                        const text = chunk.text || "";
+                        fullResponseText += text;
+                        controller.enqueue(encoder.encode(text));
+                    }
+                    controller.close();
 
-                if (isEscalated) {
-                    await UnansweredQuery.create({ ownerId, question: message });
+                    // Asynchronously log analytics after stream completes
+                    const isEscalated = fullResponseText.includes("I'm sorry, I don't have that information in my knowledge base.");
+                    const dateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+                    (async () => {
+                        try {
+                            await DailyAnalytics.findOneAndUpdate(
+                                { ownerId, date: dateStr },
+                                { 
+                                    $inc: { 
+                                        totalQueries: 1, 
+                                        deflectedQueries: isEscalated ? 0 : 1,
+                                        escalatedQueries: isEscalated ? 1 : 0
+                                    } 
+                                },
+                                { upsert: true }
+                            );
+
+                            if (isEscalated) {
+                                await UnansweredQuery.create({ ownerId, question: message });
+                            }
+                        } catch (err) {
+                            console.error("Analytics Logging Error:", err);
+                        }
+                    })();
+
+                } catch (err) {
+                    controller.error(err);
                 }
-            } catch (err) {
-                console.error("Analytics Logging Error:", err);
             }
-        })();
+        });
 
-        const response = NextResponse.json(responseText)
-        response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
-        response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-        response.headers.set("Access-Control-Allow-Headers", "Content-Type");
-        return response
+        return new Response(customReadableStream, {
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Access-Control-Allow-Origin": allowedOrigin,
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            }
+        });
 
     } catch (error: unknown) {
         console.error("CHAT API ERROR:", error);

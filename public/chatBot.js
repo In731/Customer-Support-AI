@@ -292,25 +292,74 @@
         try {
             const response = await fetch(api_Url, {
                 method: "POST",
-                headers: { "content-Type": "application/json" },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ownerId, message: text
                 })
             })
 
-            const data = await response.json()
-            messageArea.removeChild(typingContainer)
+            if (messageArea.contains(typingContainer)) {
+                messageArea.removeChild(typingContainer)
+            }
 
-            if (response.ok) {
-                addMessage(data || "something went wrong", "ai")
-            } else {
-                addMessage(data.message || "something went wrong", "ai")
+            if (!response.ok) {
+                let errorMsg = "Something went wrong. Please try again.";
+                try {
+                    const errData = await response.json();
+                    if (errData && errData.message) errorMsg = errData.message;
+                } catch {
+                    // Fallback to generic message
+                }
+                addMessage(errorMsg, "ai");
+                return;
+            }
+
+            // Create streaming AI message bubble
+            const bubbleContainer = document.createElement("div");
+            Object.assign(bubbleContainer.style, {
+                display: "flex",
+                width: "100%",
+                justifyContent: "flex-start",
+            });
+
+            const bubble = document.createElement("div");
+            bubble.textContent = "";
+            Object.assign(bubble.style, {
+                maxWidth: "85%",
+                padding: "10px 16px",
+                fontSize: "14px",
+                lineHeight: "1.5",
+                wordBreak: "break-word",
+                borderRadius: "16px",
+                background: "#f4f4f5",
+                color: "#09090b",
+                borderBottomLeftRadius: "4px"
+            });
+
+            bubbleContainer.appendChild(bubble);
+            messageArea.appendChild(bubbleContainer);
+
+            if (!response.body) {
+                bubble.textContent = "No response stream received.";
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                bubble.textContent += decoder.decode(value, { stream: true });
+                messageArea.scrollTop = messageArea.scrollHeight;
             }
 
         } catch (error) {
-            console.log(error)
-            messageArea.removeChild(typingContainer)
-            addMessage("Network error or server unavailable", "ai")
+            console.error("Chat streaming error:", error);
+            if (messageArea.contains(typingContainer)) {
+                messageArea.removeChild(typingContainer);
+            }
+            addMessage("Network error or server unavailable", "ai");
         }
     }
 })()
