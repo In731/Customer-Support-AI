@@ -4,7 +4,8 @@ import { getSession } from "./lib/getSession";
 export async function proxy() {
     const session = await getSession();
     if (!session) {
-        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}`);
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        return NextResponse.redirect(appUrl);
     }
     return NextResponse.next();
 }
