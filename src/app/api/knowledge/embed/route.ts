@@ -53,14 +53,16 @@ export async function POST(req: NextRequest) {
         for (const chunk of chunks) {
             if (!chunk.trim()) continue;
             
-            // We use gemini-embedding-001 sequentially in this batch
             const response = await ai.models.embedContent({
                 model: "gemini-embedding-001",
                 contents: chunk,
             });
             
-            const embedding = response.embeddings?.[0]?.values?.slice(0, 768);
-            if (embedding) {
+            const rawValues = (response as unknown as { embedding?: { values: number[] }; embeddings?: Array<{ values: number[] }> }).embedding?.values 
+                || (response as unknown as { embedding?: { values: number[] }; embeddings?: Array<{ values: number[] }> }).embeddings?.[0]?.values;
+                
+            const embedding = rawValues ? rawValues.slice(0, 768) : null;
+            if (embedding && embedding.length > 0) {
                 docsToInsert.push({
                     documentId,
                     tenantId,

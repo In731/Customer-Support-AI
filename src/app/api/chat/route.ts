@@ -64,16 +64,18 @@ export async function POST(req: NextRequest) {
 
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-        // 1. Generate Embedding for user message & perform Vector Search (with graceful fallback)
+        // 1. Generate Embedding for user message & perform Vector Search
         let additionalKnowledge = "";
         try {
             const embeddingResponse = await ai.models.embedContent({
                 model: 'gemini-embedding-001',
                 contents: message,
             });
-            const queryEmbedding = embeddingResponse.embeddings?.[0]?.values?.slice(0, 768);
+            const rawQueryValues = (embeddingResponse as unknown as { embedding?: { values: number[] }; embeddings?: Array<{ values: number[] }> }).embedding?.values 
+                || (embeddingResponse as unknown as { embedding?: { values: number[] }; embeddings?: Array<{ values: number[] }> }).embeddings?.[0]?.values;
+            const queryEmbedding = rawQueryValues ? rawQueryValues.slice(0, 768) : null;
 
-            if (queryEmbedding) {
+            if (queryEmbedding && queryEmbedding.length > 0) {
                 const similarChunks = await KnowledgeChunk.aggregate([
                     {
                         $vectorSearch: {
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
                             path: "embedding",
                             queryVector: queryEmbedding,
                             numCandidates: 100,
-                            limit: 3,
+                            limit: 4,
                             filter: { tenantId: ownerId } 
                         }
                     },
@@ -92,10 +94,24 @@ export async function POST(req: NextRequest) {
                         }
                     }
                 ]);
-                additionalKnowledge = similarChunks.map(c => c.text).join("\n\n");
+                if (similarChunks && similarChunks.length > 0) {
+                    additionalKnowledge = similarChunks.map(c => c.text).join("\n\n");
+                }
             }
         } catch (vectorErr) {
-            console.warn("Vector search failed or index building, proceeding with base knowledge:", vectorErr);
+            console.error("Atlas Vector Search Error (Check Atlas Index definition):", vectorErr);
+        }
+
+        // Fallback: If Atlas Vector Search returned 0 or errored, load tenant's document chunks
+        if (!additionalKnowledge) {
+            try {
+                const fallbackChunks = await KnowledgeChunk.find({ tenantId: ownerId }).sort({ _id: -1 }).limit(5);
+                if (fallbackChunks && fallbackChunks.length > 0) {
+                    additionalKnowledge = fallbackChunks.map(c => c.text).join("\n\n");
+                }
+            } catch (fallbackErr) {
+                console.error("Knowledge chunk fallback error:", fallbackErr);
+            }
         }
 
         const KNOWLEDGE = `
@@ -108,12 +124,14 @@ export async function POST(req: NextRequest) {
         `;
 
         const prompt = `
-You are a professional customer support assistant for this business.
+You are a helpful and professional customer support assistant for ${setting.businessName || "this business"}.
 
-Use ONLY the information provided below to answer the customer's question.
-You may rephrase, summarize, or interpret the information if needed.
-Do NOT invent new policies, prices, or promises.
-If you cannot answer the question based on the information provided, reply EXACTLY with: "I'm sorry, I don't have that information in my knowledge base. Please contact our human support team at ${setting.supportEmail || "our support email"} for further assistance. Is there anything else I can help you with today?"
+Answer the customer's question clearly, politely, and accurately based on the business information and documentation provided below.
+You may summarize, explain, or extract relevant answers from the context.
+Do NOT invent new policies, contact details, or false promises not mentioned in the context.
+
+If and only if the provided documentation context contains ZERO relevant information to address the question, reply with:
+"I'm sorry, I don't have that information in my knowledge base. Please contact our human support team at ${setting.supportEmail || "our support email"} for further assistance. Is there anything else I can help you with today?"
 
 --------------------
 BUSINESS INFORMATION
