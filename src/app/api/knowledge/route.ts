@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { KnowledgeDocument, KnowledgeChunk } from "@/model/knowledge.model";
-import mongoose from "mongoose";
 import pdfParse from "pdf-parse";
-import { GoogleGenAI } from "@google/genai";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import connectDb from "@/lib/db";
+import { getSession } from "@/lib/getSession";
 
 // Rate Limiter: Allow 10 file uploads per minute per IP
 const ratelimit = new Ratelimit({
@@ -13,11 +13,6 @@ const ratelimit = new Ratelimit({
     limiter: Ratelimit.slidingWindow(10, "1 m"),
     analytics: true,
 });
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-import connectDb from "@/lib/db";
-import { getSession } from "@/lib/getSession";
 
 export async function POST(req: NextRequest) {
     try {
@@ -96,9 +91,10 @@ export async function POST(req: NextRequest) {
             chunks: validChunks
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Ingestion error:", error);
-        return NextResponse.json({ error: error.message || "Failed to ingest knowledge" }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : "Failed to ingest knowledge";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 
@@ -117,12 +113,13 @@ export async function PUT(req: NextRequest) {
             { status }
         );
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to update document";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const sessionData = await getSession();
         const tenantId = sessionData?.user?.id;
@@ -157,8 +154,9 @@ export async function GET(req: NextRequest) {
         ]);
 
         return NextResponse.json(documents);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message || "Failed to load documents" }, { status: 500 });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load documents";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 
@@ -185,7 +183,8 @@ export async function DELETE(req: NextRequest) {
         await KnowledgeDocument.deleteOne({ _id: document._id });
 
         return NextResponse.json({ success: true, message: "Document removed from the knowledge base." });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message || "Failed to remove document" }, { status: 500 });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to remove document";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { KnowledgeChunk, KnowledgeDocument } from "@/model/knowledge.model";
-import mongoose from "mongoose";
 import { GoogleGenAI } from "@google/genai";
 import { getSession } from "@/lib/getSession";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import connectDb from "@/lib/db";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -14,8 +14,6 @@ const ratelimit = new Ratelimit({
     limiter: Ratelimit.slidingWindow(60, "1 m"),
     analytics: true,
 });
-
-import connectDb from "@/lib/db";
 
 export async function POST(req: NextRequest) {
     try {
@@ -78,8 +76,9 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ success: true, message: `Embedded ${docsToInsert.length} chunks.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Embedding batch error:", error);
-        return NextResponse.json({ error: error.message || "Failed to embed batch" }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : "Failed to embed batch";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

@@ -1,7 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from "motion/react"
+import { motion } from "motion/react"
 
 function EmbedClient({ ownerId }: { ownerId: string }) {
     const navigate = useRouter()
@@ -65,8 +65,8 @@ function EmbedClient({ ownerId }: { ownerId: string }) {
                             <div className="p-5 relative group">
                                 <pre className='overflow-x-auto text-sm font-mono leading-relaxed text-zinc-300'>
                                     <span className="text-blue-400">&lt;script</span> <br/>
-                                    <span className="text-sky-300 ml-4">src=</span><span className="text-amber-300">"{process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/chatBot.js"</span> <br/>
-                                    <span className="text-sky-300 ml-4">data-owner-id=</span><span className="text-amber-300">"{ownerId}"</span><span className="text-blue-400">&gt;</span><br/>
+                                    <span className="text-sky-300 ml-4">src=</span><span className="text-amber-300">&quot;{process.env.NEXT_PUBLIC_APP_URL || "https://your-domain.com"}/chatBot.js&quot;</span> <br/>
+                                    <span className="text-sky-300 ml-4">data-owner-id=</span><span className="text-amber-300">&quot;{ownerId}&quot;</span><span className="text-blue-400">&gt;</span><br/>
                                     <span className="text-blue-400">&lt;/script&gt;</span>
                                 </pre>
                                 

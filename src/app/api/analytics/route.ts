@@ -1,9 +1,9 @@
 import connectDb from "@/lib/db";
 import { DailyAnalytics, UnansweredQuery } from "@/model/analytics.model";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSession } from "@/lib/getSession";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const sessionData = await getSession();
         const tenantId = sessionData?.user?.id;
