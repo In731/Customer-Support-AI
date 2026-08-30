@@ -1,23 +1,25 @@
 # NexSupport AI (Enterprise AI Customer Support)
 
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas%20Vector%20Search-green?style=flat&logo=mongodb)](https://www.mongodb.com/)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-AI%20%26%20Embeddings-orange?style=flat&logo=google)](https://ai.google.dev/)
 [![Upstash Redis](https://img.shields.io/badge/Upstash-Rate%20Limiting-red?style=flat&logo=redis)](https://upstash.com/)
 [![Vitest](https://img.shields.io/badge/Tested%20with-Vitest-yellow?style=flat&logo=vitest)](https://vitest.dev/)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue?style=flat&logo=githubactions)](https://github.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 
-NexSupport AI is a modern, enterprise-ready B2B customer support platform that allows organizations to easily create, embed, and manage custom AI chatbots trained on their own business documentation.
+NexSupport AI is a modern, enterprise-ready B2B customer support platform that enables organizations to create, embed, and manage custom AI chatbots trained on their business documentation.
 
-By simply uploading PDF documents or text snippets, businesses generate an embeddable chat widget that provides their visitors with instant, 24/7 AI-driven support using Google's Gemini models and multi-tenant Retrieval-Augmented Generation (RAG).
+By uploading PDF manuals or text snippets, businesses generate an embeddable chat widget that provides their visitors with instant, 24/7 AI-driven support using Google's Gemini models and multi-tenant Retrieval-Augmented Generation (RAG).
 
 ---
 
 ## 🚀 Key Features
 
-* **Multi-Tenant Architecture:** Securely isolates data, settings, and documents across business tenants using `$vectorSearch` pre-filtering to guarantee complete data privacy.
-* **Client-Side Batching Queue:** A custom React architecture that bypasses Vercel Serverless timeout limits by chunking large PDFs on the frontend and streaming them to the Gemini API in batches, eliminating upload crashes.
-* **Retrieval-Augmented Generation (RAG):** Context is intelligently split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001`, and queried with cosine similarity via MongoDB Atlas Vector Search.
+* **Multi-Tenant Architecture:** Securely isolates data, settings, and vector chunks across business tenants using `$vectorSearch` pre-filtering to guarantee complete data privacy.
+* **Client-Side Batching Queue:** A custom React architecture that bypasses Serverless execution limits (Vercel/AWS) by chunking large PDFs on the frontend and streaming them to the Gemini API in batches, reducing server timeouts by 100%.
+* **Retrieval-Augmented Generation (RAG):** Context is intelligently split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001` (768 dimensions), and queried with cosine similarity via MongoDB Atlas Vector Search.
 * **Zero-Overhead Analytics Engine:** Tracks daily query volumes, deflection rates, and detects "Knowledge Gaps" (unanswered questions) using asynchronous TTL indexing without blocking user chat responses.
 * **Embeddable Chat Widget:** A lightweight, dependency-free chat widget (`chatBot.js`) featuring modern Shadcn-style UI that embeds into any website with a single `<script>` tag.
 * **Enterprise Authentication:** Seamless B2B login and session management powered by Scalekit (supporting SSO, SAML, and OAuth).
@@ -28,9 +30,9 @@ By simply uploading PDF documents or text snippets, businesses generate an embed
 
 NexSupport AI implements strict, multi-layered enterprise security controls:
 
-1. **Domain Whitelisting (CORS Firewall):** The chat API actively intercepts the `Origin` and `Referer` headers, verifying them against the tenant's authorized domains. Unauthorized sites attempting to hijack the embed script are immediately rejected with `403 Forbidden`.
-2. **Server-Side Session Validation (Anti-IDOR):** Client-side IDs are never trusted on mutating operations. All authenticated endpoints extract identity directly from verified session tokens via the `getSession()` utility.
-3. **Multi-Layered Edge Rate Limiting:** All public (`/api/chat`) and ingestion (`/api/knowledge`) routes are shielded by an Upstash Serverless Redis Sliding Window rate limiter to eliminate DDoS and brute-force attacks.
+1. **RFC 3986 Hostname Firewall ([`src/lib/cors.ts`](./src/lib/cors.ts)):** The chat API verifies the exact `Origin` and `Referer` hostnames against tenant-allowed domains, strictly blocking substring bypasses, sibling suffix attacks (`evil-acme.com`), and referer query smuggling.
+2. **Server-Side Session Validation (Anti-IDOR):** Client-supplied tenant IDs are ignored on mutating operations. All authenticated endpoints extract identity directly from verified session tokens via the `getSession()` utility.
+3. **Multi-Layered Edge Rate Limiting:** Public chat (`/api/chat`) and ingestion (`/api/knowledge`) routes are shielded by Upstash Serverless Redis Sliding Window rate limiters to eliminate DDoS and brute-force attacks.
 4. **Memory DoS & Payload Bounds:** Strict backend limits (10MB buffer maximum, 20 chunks per batch) reject oversized payloads before they reach Node.js memory buffers.
 5. **XSS Sanitization:** The embed widget uses `textContent` DOM insertion instead of `innerHTML`, blocking stored and reflected Cross-Site Scripting.
 
@@ -45,7 +47,7 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 
 ### Backend & Infrastructure
 - **API Engine:** Next.js Serverless API Routes
-- **Database:** MongoDB & Mongoose
+- **Database:** MongoDB & Mongoose (with connection pooling error-recovery in `db.ts`)
 - **Vector Search:** MongoDB Atlas Vector Search (Cosine Similarity, 768 dimensions)
 - **Authentication:** Scalekit SDK (B2B Multi-Tenant OAuth)
 - **Rate Limiting:** Upstash Serverless Redis (`@upstash/ratelimit`)
@@ -53,19 +55,24 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 ### AI & Testing
 - **LLM Engine:** Google Gemini (`gemini-3.5-flash` for generation, `gemini-embedding-001` for vectors)
 - **NLP Processing:** LangChain (`RecursiveCharacterTextSplitter`) & `pdf-parse`
-- **Testing:** Vitest (Automated unit testing for chunking mathematics and security firewalls)
+- **Testing & CI:** Vitest (Automated unit testing) & GitHub Actions (CI on push/PR)
 
 ---
 
-## 🧪 Automated Testing
+## 🧪 Automated Testing & CI/CD
 
-The project includes an automated unit test suite powered by **Vitest** to mathematically prove core business logic and security policies:
+The project includes an automated test suite powered by **Vitest** and enforced via **GitHub Actions** (`.github/workflows/ci.yml`):
 * **AI NLP Mathematics:** Verifies LangChain's chunking configurations (overlap bounds, max chunk sizing) to ensure text isn't truncated or corrupted.
-* **CORS Firewall Rules:** Asserts that the Domain Whitelisting logic correctly handles authorized origins, malicious origins, and fallback modes.
+* **CORS Firewall Threat Vectors:** Asserts that `isOriginAllowed` handles valid domains, multi-level subdomains, port normalization (`localhost:3000`), and blocks adversarial suffix injections (`evil-acme.com.attacker.net`) and URL parameter smuggling.
 
 To run the test suite locally:
 ```bash
-npm run test
+npm test
+```
+
+To run lint checks:
+```bash
+npm run lint
 ```
 
 ---
@@ -124,17 +131,21 @@ Navigate to `http://localhost:3000` to access the application.
 ## 🗺️ Project Structure
 
 ```text
+├── .github/workflows/
+│   └── ci.yml             # Automated CI pipeline (lint + unit tests on Node 22)
 ├── public/
-│   └── chatBot.js         # The embeddable, cross-origin chat widget
+│   └── chatBot.js         # Lightweight, cross-origin embeddable chat widget
 ├── src/
 │   ├── app/
-│   │   ├── api/           # Next.js Serverless API Routes (chat, knowledge, settings, analytics)
-│   │   ├── dashboard/     # Tenant UI (Settings, Knowledge, and Analytics)
+│   │   ├── api/           # Serverless API Routes (chat, knowledge, settings, analytics, auth)
+│   │   ├── dashboard/     # Tenant Management UI (Settings, Knowledge, and Analytics)
 │   │   └── embed/         # Embed script snippet generator & live preview
 │   ├── components/        # React Components (DashboardClient, EmbedClient, HomeClient)
-│   ├── lib/               # Utilities (DB connection caching, Scalekit session handling)
-│   └── model/             # Mongoose Schemas (Settings, Knowledge, Analytics)
+│   ├── lib/               # Utilities (db.ts connection pooling, cors.ts, Scalekit session)
+│   ├── model/             # Mongoose Schemas (Settings, Knowledge, Analytics)
+│   └── types.d.ts         # Centralized TypeScript interfaces
 ├── __tests__/             # Vitest Unit Test Suites
+├── LICENSE                # MIT License
 ```
 
 ---
@@ -160,17 +171,18 @@ graph TD
     Widget -->|POST /api/chat| API[Next.js Serverless API]
     
     API -->|1. Rate Limit Check| Upstash[(Upstash Redis)]
-    API -->|2. Auth & CORS Check| DB1[(MongoDB Settings)]
-    API -->|3. Embed Query| Gemini1[Google Gemini API]
+    API -->|2. RFC Hostname Check| CORS[src/lib/cors.ts]
+    API -->|3. Auth Check| DB1[(MongoDB Settings)]
+    API -->|4. Embed Query| Gemini1[Google Gemini API]
     
     Gemini1 -->|Returns Vector| API
-    API -->|4. $vectorSearch| Atlas[(Atlas Vector Database)]
+    API -->|5. $vectorSearch with tenantId| Atlas[(Atlas Vector Database)]
     
     Atlas -->|Returns Context| API
-    API -->|5. Prompt Generation| Gemini2[Google Gemini API]
+    API -->|6. Prompt Generation| Gemini2[Google Gemini API]
     
     Gemini2 -->|Streams Answer| API
-    API -->|6. Async Telemetry| DB2[(MongoDB Analytics)]
+    API -->|7. Async Telemetry| DB2[(MongoDB Analytics)]
     
     API -->|Sends Response| Widget
 ```
@@ -183,5 +195,11 @@ graph TD
 2. **Ingestion (Batched):** The business uploads PDFs. The `/api/knowledge` endpoint parses the PDF and returns LangChain chunks. The React frontend orchestrates a Client-Side Queue, streaming batches of 5 chunks to `/api/knowledge/embed` while rendering a real-time progress bar. This guarantees 0% server timeouts.
 3. **Integration:** The business copies the provided `<script src=".../chatBot.js" data-owner-id="..."></script>` and pastes it into their website's HTML.
 4. **Chatting:** When a customer asks a question, the widget sends a CORS-secured POST request to `/api/chat`. 
-5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces Domain Whitelisting, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and returns a contextual answer via `gemini-3.5-flash`.
-6. **Analytics:** The outcome of the conversation is asynchronously logged to the MongoDB TTL Analytics collections without blocking the user's response.
+5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces RFC 3986 Hostname validation, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and returns a contextual answer via `gemini-3.5-flash`.
+6. **Analytics:** The outcome of the conversation is asynchronously logged to MongoDB TTL Analytics collections without blocking the user's response.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
