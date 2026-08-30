@@ -19,7 +19,7 @@ By uploading PDF manuals or text snippets, businesses generate an embeddable cha
 
 * **Multi-Tenant Architecture:** Securely isolates data, settings, and vector chunks across business tenants using `$vectorSearch` pre-filtering to guarantee tenant data separation.
 * **Client-Side Batching Queue:** A custom React ingestion architecture designed to eliminate serverless execution timeouts on large multi-page PDFs by chunking on the client and streaming sequential 5-chunk batches to the embedding API.
-* **Real-Time Token Streaming:** Delivers sub-300ms Time-to-First-Token (TTFT) by streaming responses from Gemini's `generateContentStream` through a standard Web `ReadableStream` directly into the embed widget.
+* **Real-Time Token Streaming:** Minimizes perceived waiting latency by streaming responses from Gemini's `generateContentStream` through a standard Web `ReadableStream` directly into the embed widget as tokens are generated.
 * **Retrieval-Augmented Generation (RAG):** Context is split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001` (768 dimensions), and queried with cosine similarity via MongoDB Atlas Vector Search.
 * **Zero-Overhead Analytics Engine:** Tracks daily query volumes, deflection rates, and detects "Knowledge Gaps" (unanswered questions) using asynchronous TTL indexing without blocking user chat responses.
 * **Embeddable Chat Widget:** A lightweight, dependency-free chat widget (`chatBot.js`) featuring modern Shadcn-style UI that embeds into any website with a single `<script>` tag.
