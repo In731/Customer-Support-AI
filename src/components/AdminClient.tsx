@@ -117,9 +117,11 @@ export default function AdminClient() {
                     className="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 shadow-2xl relative z-10"
                 >
                     <div className="flex items-center justify-center mb-6">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                            <span className="text-white font-bold text-xl">🛡️</span>
-                        </div>
+                        <img 
+                            src="/logo.png" 
+                            alt="NexSupport AI" 
+                            className="w-16 h-16 object-contain rounded-2xl shadow-xl shadow-indigo-500/20 ring-1 ring-zinc-800"
+                        />
                     </div>
 
                     <h1 className="text-2xl font-bold text-center tracking-tight text-white mb-1">NexSupport AI Team</h1>
@@ -167,9 +169,11 @@ export default function AdminClient() {
             <div className="sticky top-0 z-40 bg-zinc-950/70 backdrop-blur-xl border-b border-zinc-800/80">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md">
-                            <span className="text-white font-bold text-sm">N</span>
-                        </div>
+                        <img 
+                            src="/logo.png" 
+                            alt="NexSupport AI Logo" 
+                            className="w-8 h-8 object-contain rounded-lg shadow-sm"
+                        />
                         <div>
                             <div className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
                                 NexSupport <span className="text-indigo-400">Operations</span>
