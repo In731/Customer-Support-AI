@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from "motion/react"
+import { motion } from "motion/react"
 import axios, { isAxiosError } from 'axios'
 
 interface CompanyData {
