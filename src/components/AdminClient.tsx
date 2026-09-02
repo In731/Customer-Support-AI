@@ -110,17 +110,17 @@ export default function AdminClient() {
         return (
             <div className="min-h-screen bg-zinc-50/50 text-zinc-900 flex items-center justify-center p-6 selection:bg-indigo-100 selection:text-indigo-900">
                 <div className="fixed top-0 inset-x-0 h-96 bg-gradient-to-b from-indigo-50/60 via-violet-50/30 to-transparent pointer-events-none" />
-                
-                <motion.div 
+
+                <motion.div
                     initial={{ opacity: 0, y: 20, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     className="w-full max-w-md bg-white/80 backdrop-blur-xl border border-zinc-200/80 rounded-3xl p-8 shadow-xl shadow-zinc-200/50 relative z-10"
                 >
                     <div className="flex items-center justify-center mb-6">
-                        <img 
-                            src="/logo.png" 
-                            alt="NexSupport AI" 
-                            className="w-16 h-16 object-contain rounded-2xl shadow-lg shadow-indigo-500/10 ring-1 ring-zinc-200/60"
+                        <img
+                            src="/logo.png"
+                            alt="NexSupport AI"
+                            className="w-24 h-24 object-contain rounded-2xl shadow-lg shadow-indigo-500/10 ring-1 ring-zinc-200/60"
                         />
                     </div>
 
@@ -169,9 +169,9 @@ export default function AdminClient() {
             <div className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50 shadow-sm shadow-zinc-200/20">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <img 
-                            src="/logo.png" 
-                            alt="NexSupport AI Logo" 
+                        <img
+                            src="/logo.png"
+                            alt="NexSupport AI Logo"
                             className="w-8 h-8 object-contain rounded-lg shadow-sm"
                         />
                         <div>
@@ -182,7 +182,7 @@ export default function AdminClient() {
                         </div>
                     </div>
 
-                    <button 
+                    <button
                         onClick={handleLogout}
                         className="px-4 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm"
                     >
@@ -199,7 +199,7 @@ export default function AdminClient() {
                         <p className="text-zinc-500 text-sm">Real-time health, vector capacity, and client onboarding metrics across NexSupport AI.</p>
                     </div>
 
-                    <button 
+                    <button
                         onClick={fetchAdminStats}
                         disabled={loadingData}
                         className="self-start md:self-auto px-4 py-2 rounded-xl bg-white border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm flex items-center gap-2"
@@ -281,7 +281,7 @@ export default function AdminClient() {
 
                         {/* Search Bar */}
                         <div className="relative w-full md:w-80">
-                            <input 
+                            <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -332,8 +332,8 @@ export default function AdminClient() {
                                                 </span>
                                             </td>
                                             <td className="py-3.5 px-4 text-zinc-500 max-w-[160px] truncate">
-                                                {c.allowedDomains && c.allowedDomains.length > 0 
-                                                    ? c.allowedDomains.join(", ") 
+                                                {c.allowedDomains && c.allowedDomains.length > 0
+                                                    ? c.allowedDomains.join(", ")
                                                     : "All Domains (*)"}
                                             </td>
                                             <td className="py-3.5 px-4 text-zinc-500 whitespace-nowrap">
