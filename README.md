@@ -21,8 +21,9 @@ By uploading PDF manuals or text snippets, businesses generate an embeddable cha
 * **Client-Side Batching Queue:** A custom React ingestion architecture designed to eliminate serverless execution timeouts on large multi-page PDFs by chunking on the client and streaming sequential 5-chunk batches to the embedding API.
 * **Real-Time Token Streaming:** Minimizes perceived waiting latency by streaming responses from Gemini's `generateContentStream` through a standard Web `ReadableStream` directly into the embed widget as tokens are generated.
 * **Retrieval-Augmented Generation (RAG):** Context is split using **LangChain's RecursiveCharacterTextSplitter**, vectorized using `gemini-embedding-001` (768 dimensions), and queried with cosine similarity via MongoDB Atlas Vector Search.
+* **Internal Operations Super-Admin Dashboard (`/admin`):** A dedicated, passcode-protected management portal for the NexSupport AI team to monitor platform-wide metrics (total client companies, total documents hosted, total vector chunks in Atlas, global chat deflection rate, and a searchable company directory).
 * **Zero-Overhead Analytics Engine:** Tracks daily query volumes, deflection rates, and detects "Knowledge Gaps" (unanswered questions) using asynchronous TTL indexing without blocking user chat responses.
-* **Embeddable Chat Widget:** A lightweight, dependency-free chat widget (`chatBot.js`) featuring modern Shadcn-style UI that embeds into any website with a single `<script>` tag.
+* **Embeddable Chat Widget:** A lightweight, dependency-free chat widget (`chatBot.js`) featuring modern UI that automatically detects its host origin and embeds into any website with a single `<script>` tag.
 * **Enterprise Authentication:** Seamless B2B login and session management powered by Scalekit (supporting SSO, SAML, and OAuth).
 
 ---
@@ -33,10 +34,11 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 
 1. **RFC 3986 Hostname Firewall ([`src/lib/cors.ts`](./src/lib/cors.ts)):** The chat API verifies the exact `Origin` and `Referer` hostnames against tenant-allowed domains, strictly blocking substring bypasses, sibling suffix attacks (`evil-acme.com`), and referer query smuggling.
 2. **Server-Side Session Validation (Anti-IDOR):** Client-supplied tenant IDs are ignored on mutating operations. All authenticated endpoints extract identity directly from verified session tokens via the `getSession()` utility.
-3. **Multi-Layered Edge Rate Limiting:** Public chat (`/api/chat`) and ingestion (`/api/knowledge`) routes are shielded by Upstash Serverless Redis Sliding Window rate limiters to eliminate DDoS and brute-force attacks.
-4. **Memory DoS & Payload Bounds:** Strict backend limits (10MB buffer maximum, 20 chunks per batch) reject oversized payloads before they reach Node.js memory buffers.
-5. **XSS Sanitization:** The embed widget uses `textContent` DOM insertion instead of `innerHTML`, blocking stored and reflected Cross-Site Scripting.
-6. **Error Sanitization (CWE-209 Patch):** Internal database drivers and stack traces are suppressed from client responses and logged exclusively on the server console.
+3. **Passcode-Protected Team Portal:** The internal `/admin` dashboard is fortified with constant-time SHA-256 token verification (`crypto.timingSafeEqual`) and HTTP-only session cookies.
+4. **Multi-Layered Edge Rate Limiting:** Public chat (`/api/chat`) and ingestion (`/api/knowledge`) routes are shielded by Upstash Serverless Redis Sliding Window rate limiters to eliminate DDoS and brute-force attacks.
+5. **Memory DoS & Payload Bounds:** Strict backend limits (10MB buffer maximum, 20 chunks per batch) reject oversized payloads before they reach Node.js memory buffers.
+6. **XSS Sanitization:** The embed widget uses `textContent` DOM insertion instead of `innerHTML`, blocking stored and reflected Cross-Site Scripting.
+7. **Error Sanitization (CWE-209 Patch):** Internal database drivers and stack traces are suppressed from client responses and logged exclusively on the server console.
 
 ---
 
@@ -44,14 +46,14 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 
 ### Frontend & Widget
 - **Framework:** Next.js (App Router) & React
-- **Styling & Motion:** TailwindCSS & Framer Motion (for real-time upload progress and micro-interactions)
-- **Embed Widget:** Vanilla JS (`chatBot.js`) with streaming `ReadableStreamDefaultReader` and zero external dependencies
+- **Styling & Motion:** TailwindCSS & Motion (for real-time upload progress and micro-interactions)
+- **Embed Widget:** Vanilla JS (`chatBot.js`) with streaming `ReadableStreamDefaultReader` and dynamic origin detection
 
 ### Backend & Infrastructure
 - **API Engine:** Next.js Serverless API Routes (with UTF-8 `ReadableStream` response streaming)
 - **Database:** MongoDB & Mongoose (with connection pooling error-recovery in `db.ts`)
 - **Vector Search:** MongoDB Atlas Vector Search (Cosine Similarity, 768 dimensions with pre-filtered `tenantId`)
-- **Authentication:** Scalekit SDK (B2B Multi-Tenant OAuth)
+- **Authentication:** Scalekit SDK (B2B Multi-Tenant OAuth) & Custom Admin Passcode Session
 - **Rate Limiting:** Upstash Serverless Redis (`@upstash/ratelimit`)
 
 ### AI & Testing
@@ -64,6 +66,7 @@ NexSupport AI implements strict, multi-layered enterprise security controls:
 ## 🧪 Automated Testing & CI/CD
 
 The project includes an automated test suite powered by **Vitest** and enforced via **GitHub Actions** (`.github/workflows/ci.yml`):
+* **Admin Authentication:** Asserts constant-time master passcode verification and rejects unauthorized requests.
 * **AI NLP Mathematics:** Verifies LangChain's chunking configurations (overlap bounds, max chunk sizing) to ensure text isn't truncated or corrupted.
 * **CORS Firewall Threat Vectors:** Asserts that `isOriginAllowed` handles valid domains, multi-level subdomains, port normalization (`localhost:3000`), and blocks adversarial suffix injections (`evil-acme.com.attacker.net`) and URL parameter smuggling.
 
@@ -111,6 +114,9 @@ SCALEKIT_CLIENT_SECRET="your_scalekit_client_secret"
 UPSTASH_REDIS_REST_URL="your_upstash_redis_url"
 UPSTASH_REDIS_REST_TOKEN="your_upstash_redis_token"
 
+# Internal Super-Admin Passcode
+ADMIN_PASSWORD="your_master_admin_passcode"
+
 # Public App URL
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
@@ -141,7 +147,7 @@ In your MongoDB Atlas cluster, navigate to **Atlas Search** > **Create Search In
 ```bash
 npm run dev
 ```
-Navigate to `http://localhost:3000` to access the application.
+Navigate to `http://localhost:3000` to access the application (or `http://localhost:3000/admin` for the team portal).
 
 ---
 
@@ -151,14 +157,16 @@ Navigate to `http://localhost:3000` to access the application.
 ├── .github/workflows/
 │   └── ci.yml             # Automated CI pipeline (lint + unit tests on Node 22)
 ├── public/
-│   └── chatBot.js         # Real-time streaming embeddable chat widget
+│   ├── chatBot.js         # Real-time streaming embeddable chat widget
+│   └── logo.png           # NexSupport AI brand logo & favicon
 ├── src/
 │   ├── app/
-│   │   ├── api/           # Serverless API Routes (chat, knowledge, settings, analytics, auth)
+│   │   ├── admin/         # Internal Super-Admin Operations Dashboard
+│   │   ├── api/           # Serverless API Routes (admin, chat, knowledge, settings, analytics, auth)
 │   │   ├── dashboard/     # Tenant Management UI (Settings, Knowledge, and Analytics)
 │   │   └── embed/         # Embed script snippet generator & live preview
-│   ├── components/        # React Components (DashboardClient, EmbedClient, HomeClient)
-│   ├── lib/               # Utilities (db.ts connection pooling, cors.ts, Scalekit session)
+│   ├── components/        # React Components (AdminClient, DashboardClient, EmbedClient, HomeClient)
+│   ├── lib/               # Utilities (adminAuth.ts, db.ts connection pooling, cors.ts, Scalekit session)
 │   ├── model/             # Mongoose Schemas (Settings, Knowledge, Analytics)
 │   └── types.d.ts         # Centralized TypeScript interfaces
 ├── __tests__/             # Vitest Unit Test Suites
@@ -169,14 +177,20 @@ Navigate to `http://localhost:3000` to access the application.
 
 ## 📡 Core API Routes
 
+### Customer & Widget Endpoints
 - `POST /api/chat`: Public-facing, CORS-protected endpoint that executes multi-tenant RAG and streams real-time AI responses via a Web `ReadableStream`.
-- `POST /api/knowledge`: (Phase 1 Ingestion) Parses uploaded PDFs/TXT and runs LangChain to return structured text chunks to the browser.
+- `POST /api/knowledge`: (Phase 1 Ingestion) Parses uploaded PDFs/TXT and returns structured text chunks to the browser.
 - `POST /api/knowledge/embed`: (Phase 2 Ingestion) Receives chunk batches from the browser queue, calls Gemini Embeddings, and bulk-inserts vectors into MongoDB.
 - `GET /api/knowledge`: Retrieves a tenant's uploaded documents and chunk processing stats.
 - `DELETE /api/knowledge`: Removes a document and cascades deletion of all associated vector chunks.
 - `GET /api/settings/public`: Exposes safe public widget branding tokens (color, icon, welcome text) to the embed script.
 - `POST /api/settings`: Updates tenant configurations, including the CORS Domain Whitelist.
 - `GET /api/analytics`: Fetches real-time chat volumes, deflection metrics, and unanswered knowledge gaps.
+
+### Internal Team & Admin Endpoints
+- `POST /api/admin/login`: Authenticates the NexSupport AI team via master passcode and issues an HTTP-only session cookie.
+- `POST /api/admin/logout`: Invalidates the internal admin session.
+- `GET /api/admin/stats`: Aggregates platform-wide KPI counts and company directories.
 
 ---
 
@@ -214,6 +228,7 @@ graph TD
 4. **Chatting:** When a customer asks a question, the widget sends a CORS-secured POST request to `/api/chat`. 
 5. **RAG Pipeline:** The backend rate-limits the request via Upstash, enforces RFC 3986 Hostname validation, embeds the user's question, performs a multi-tenant MongoDB Vector Search to find the most relevant document chunks, and streams real-time tokens using `gemini-3.5-flash` via a Web `ReadableStream`.
 6. **Analytics:** The outcome of the conversation is asynchronously logged to MongoDB TTL Analytics collections without blocking the streamed response.
+7. **Platform Oversight:** The NexSupport AI team monitors platform growth, total stored vectors, and customer deflection performance via the internal `/admin` portal.
 
 ---
 
